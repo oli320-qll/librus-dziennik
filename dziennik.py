@@ -71,7 +71,7 @@ conn = sqlite3.connect("dziennik_szkolny.db", check_same_thread=False)
 c = conn.cursor()
 
 # Inicjalizacja tabel
-c.execute("CREATE TABLE IF NOT EXISTS uzytkownicy (id INTEGER PRIMARY KEY AUTOINCREMENT, imie_nazwisko TEXT, login TEXT UNIQUE, haslo TEXT, rola TEXT, klasa TEXT, powiazany_uczen TEXT)")
+c.execute("CREATE TABLE IF NOT EXISTS uzytkownicy (id INTEGER PRIMARY KEY AUTOINCREMENT, imie_nazwisko TEXT, login TEXT, haslo TEXT, rola TEXT, klasa TEXT, powiazany_uczen TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS klasy (id INTEGER PRIMARY KEY AUTOINCREMENT, nazwa_klasy TEXT UNIQUE, wychowawca TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS przypisania (id INTEGER PRIMARY KEY AUTOINCREMENT, nauczyciel TEXT, przedmiot TEXT, klasa TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS oceny (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, przedmiot TEXT, ocena INTEGER, waga INTEGER, kategoria TEXT, data TEXT, komentarz TEXT)")
@@ -84,7 +84,7 @@ c.execute("CREATE TABLE IF NOT EXISTS dyzury (id INTEGER PRIMARY KEY AUTOINCREME
 c.execute("CREATE TABLE IF NOT EXISTS oceny_zachowania (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, okres TEXT, ocena TEXT, opis TEXT)")
 conn.commit()
 
-# Bezpieczna migracja kolumn (dodaje brakujące kolumny, jeśli baza już istniała)
+# Bezpieczna migracja kolumn
 migracje = [
     ("oceny", "kategoria", "TEXT"),
     ("oceny", "komentarz", "TEXT"),
@@ -274,13 +274,16 @@ if st.session_state["dziennik_user"] is None:
             btn_log = st.form_submit_button("Zaloguj się", type="primary", use_container_width=True)
             
             if btn_log:
-                c.execute("SELECT imie_nazwisko, rola FROM uzytkownicy WHERE login = ? AND haslo = ?", (login_in, haslo_in))
+                c.execute("SELECT imie_nazwisko, rola, login FROM uzytkownicy WHERE login = ? AND haslo = ?", (login_in, haslo_in))
                 res = c.fetchone()
                 if res:
-                    st.session_state["dziennik_user"] = res[0]
-                    st.session_state["dziennik_rola"] = res[1]
-                    st.success("Zalogowano pomyślnie!")
-                    st.rerun()
+                    if res[2] == "brak":
+                        st.error("To konto ucznia nie ma jeszcze aktywnego loginu (brak dostępu). Skontaktuj się z administratorem.")
+                    else:
+                        st.session_state["dziennik_user"] = res[0]
+                        st.session_state["dziennik_rola"] = res[1]
+                        st.success("Zalogowano pomyślnie!")
+                        st.rerun()
                 else:
                     st.error("Błędny login lub hasło!")
     st.stop()
@@ -289,7 +292,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:42</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:46</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -436,14 +439,20 @@ elif rola == "Admin":
         
         sub_adm_t1, sub_adm_t2, sub_adm_t3 = st.tabs(["➕ Dodaj użytkownika", "✏️ Edytuj użytkownika", "🗑️ Usuń użytkownika"])
         
+        # Pobranie listy uczniów do wyboru dla rodziców
+        c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
+        uczniowie_baza = [u[0] for u in c.fetchall()]
+        if not uczniowie_baza:
+            uczniowie_baza = ["Brak uczniów"]
+
         with sub_adm_t1:
             with st.form("form_dodaj_uzytkownika"):
                 d_imie = st.text_input("Imię i nazwisko:")
-                d_login = st.text_input("Login:")
-                d_haslo = st.text_input("Hasło:", type="password")
+                d_login = st.text_input("Login (wpisz 'brak' jeśli uczeń nie ma mieć loginu):", value="brak")
+                d_haslo = st.text_input("Hasło:", value="brak", type="password")
                 d_rola = st.selectbox("Rola:", ["Admin", "Nauczyciel", "Uczeń", "Rodzic"])
                 d_klasa = st.text_input("Klasa (np. 1c lub '-' dla Admina):", value="1c")
-                d_powiazany = st.text_input("Powiązany uczeń (dla Rodzica, np. Emilia Widomska):", value="-")
+                d_powiazany = st.selectbox("Powiązany uczeń (dla Rodzica):", ["-"] + uczniowie_baza)
                 
                 if st.form_submit_button("Dodaj użytkownika", type="primary"):
                     try:
@@ -469,12 +478,17 @@ elif rola == "Admin":
                 
                 with st.form("form_edytuj_uzytkownika"):
                     ed_imie = st.text_input("Imię i nazwisko:", value=dane_u[0])
-                    ed_login = st.text_input("Login:", value=dane_u[1])
+                    ed_login = st.text_input("Login (wpisz 'brak', aby zablokować logowanie):", value=dane_u[1])
                     ed_haslo = st.text_input("Hasło:", value=dane_u[2])
                     role_lista = ["Admin", "Nauczyciel", "Uczeń", "Rodzic"]
                     ed_rola = st.selectbox("Rola:", role_lista, index=role_lista.index(dane_u[3]) if dane_u[3] in role_lista else 0)
                     ed_klasa = st.text_input("Klasa:", value=dane_u[4])
-                    ed_powiazany = st.text_input("Powiązany uczeń:", value=dane_u[5])
+                    
+                    # Indeks powiązanego ucznia
+                    akt_pow = dane_u[5]
+                    opcje_pow = ["-"] + uczniowie_baza
+                    idx_pow = opcje_pow.index(akt_pow) if akt_pow in opcje_pow else 0
+                    ed_powiazany = st.selectbox("Powiązany uczeń (dla Rodzica):", opcje_pow, index=idx_pow)
                     
                     if st.form_submit_button("Zapisz zmiany", type="primary"):
                         c.execute("UPDATE uzytkownicy SET imie_nazwisko = ?, login = ?, haslo = ?, rola = ?, klasa = ?, powiazany_uczen = ? WHERE id = ?",
