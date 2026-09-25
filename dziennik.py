@@ -127,31 +127,16 @@ WSZYSTKIE_PRZEDMIOTY = [
     "Język angielski", "Język polski", "Matematyka", "Plastyka", "Wychowanie fizyczne"
 ]
 
-# Rozszerzona lista kategorii z Librusa
 KATEGORIE_OCEN = [
-    "aktywność", 
-    "inna", 
-    "kartkówka", 
-    "odpowiedź ustna", 
-    "przewidywana roczna", 
-    "przewidywana śródroczna", 
-    "roczna", 
-    "sprawdzian", 
-    "śródroczna", 
-    "zadanie", 
-    "zeszyt"
+    "aktywność", "inna", "kartkówka", "odpowiedź ustna", 
+    "przewidywana roczna", "przewidywana śródroczna", 
+    "roczna", "sprawdzian", "śródroczna", "zadanie", "zeszyt"
 ]
 
 PELNE_GODZINY_LEKCYJNE = [
-    "1 [07:10 - 07:55]",
-    "2 [08:00 - 08:45]",
-    "3 [08:55 - 09:40]",
-    "4 [09:50 - 10:35]",
-    "5 [10:45 - 11:30]",
-    "6 [11:50 - 12:35]",
-    "7 [12:45 - 13:30]",
-    "8 [13:40 - 14:25]",
-    "9 [14:30 - 15:10]"
+    "1 [07:10 - 07:55]", "2 [08:00 - 08:45]", "3 [08:55 - 09:40]",
+    "4 [09:50 - 10:35]", "5 [10:45 - 11:30]", "6 [11:50 - 12:35]",
+    "7 [12:45 - 13:30]", "8 [13:40 - 14:25]", "9 [14:30 - 15:10]"
 ]
 
 def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
@@ -302,7 +287,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:35</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:37</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -445,9 +430,72 @@ elif rola == "Admin":
             st.info("Brak ocen z zachowania w bazie.")
 
     with adm_tab3:
-        st.subheader("Lista Użytkowników")
-        df_u = pd.read_sql("SELECT id, imie_nazwisko as [Imię i Nazwisko], login as [Login], rola as [Rola], klasa as [Klasa] FROM uzytkownicy", conn)
-        st.dataframe(df_u, use_container_width=True, hide_index=True)
+        st.subheader("Zarządzanie Użytkownikami")
+        
+        sub_adm_t1, sub_adm_t2, sub_adm_t3 = st.tabs(["➕ Dodaj użytkownika", "✏️ Edytuj użytkownika", "🗑️ Usuń użytkownika"])
+        
+        with sub_adm_t1:
+            with st.form("form_dodaj_uzytkownika"):
+                d_imie = st.text_input("Imię i nazwisko:")
+                d_login = st.text_input("Login:")
+                d_haslo = st.text_input("Hasło:", type="password")
+                d_rola = st.selectbox("Rola:", ["Admin", "Nauczyciel", "Uczeń", "Rodzic"])
+                d_klasa = st.text_input("Klasa (np. 1c lub '-' dla Admina):", value="1c")
+                d_powiazany = st.text_input("Powiązany uczeń (dla Rodzica, np. Emilia Widomska):", value="-")
+                
+                if st.form_submit_button("Dodaj użytkownika", type="primary"):
+                    try:
+                        c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)",
+                                  (d_imie, d_login, d_haslo, d_rola, d_klasa, d_powiazany))
+                        conn.commit()
+                        st.success(f"Dodano użytkownika {d_imie}!")
+                        st.rerun()
+                    except sqlite3.IntegrityError:
+                        st.error("Użytkownik o takim loginie już istnieje!")
+
+        with sub_adm_t2:
+            c.execute("SELECT id, imie_nazwisko FROM uzytkownicy")
+            wszyscy_u = c.fetchall()
+            u_slownik = {f"{u[1]} (ID: {u[0]})": u[0] for u in wszyscy_u}
+            
+            if u_slownik:
+                wybrany_do_edycji_str = st.selectbox("Wybierz użytkownika do edycji:", list(u_slownik.keys()))
+                ed_id = u_slownik[wybrany_do_edycji_str]
+                
+                c.execute("SELECT imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen FROM uzytkownicy WHERE id = ?", (ed_id,))
+                dane_u = c.fetchone()
+                
+                with st.form("form_edytuj_uzytkownika"):
+                    ed_imie = st.text_input("Imię i nazwisko:", value=dane_u[0])
+                    ed_login = st.text_input("Login:", value=dane_u[1])
+                    ed_haslo = st.text_input("Hasło:", value=dane_u[2])
+                    role_lista = ["Admin", "Nauczyciel", "Uczeń", "Rodzic"]
+                    ed_rola = st.selectbox("Rola:", role_lista, index=role_lista.index(dane_u[3]) if dane_u[3] in role_lista else 0)
+                    ed_klasa = st.text_input("Klasa:", value=dane_u[4])
+                    ed_powiazany = st.text_input("Powiązany uczeń:", value=dane_u[5])
+                    
+                    if st.form_submit_button("Zapisz zmiany", type="primary"):
+                        c.execute("UPDATE uzytkownicy SET imie_nazwisko = ?, login = ?, haslo = ?, rola = ?, klasa = ?, powiazany_uczen = ? WHERE id = ?",
+                                  (ed_imie, ed_login, ed_haslo, ed_rola, ed_klasa, ed_powiazany, ed_id))
+                        conn.commit()
+                        st.success("Zaktualizowano dane użytkownika!")
+                        st.rerun()
+            else:
+                st.info("Brak użytkowników.")
+
+        with sub_adm_t3:
+            df_u_del = pd.read_sql("SELECT id, imie_nazwisko as [Imię i Nazwisko], login as [Login], rola as [Rola] FROM uzytkownicy", conn)
+            st.dataframe(df_u_del, use_container_width=True, hide_index=True)
+            with st.form("form_usun_uzytkownika"):
+                id_u_del = st.selectbox("Wybierz ID użytkownika do usunięcia:", df_u_del["id"].tolist() if not df_u_del.empty else [0])
+                if st.form_submit_button("Usuń użytkownika", type="primary"):
+                    if id_u_del > 1: # Zabezpieczenie głównego admina (ID 1)
+                        c.execute("DELETE FROM uzytkownicy WHERE id = ?", (id_u_del,))
+                        conn.commit()
+                        st.success("Usunięto użytkownika!")
+                        st.rerun()
+                    else:
+                        st.error("Nie można usunąć głównego administratora systemowego (ID 1)!")
 
     with adm_tab4:
         renderuj_zakladke_wiadomosci("Administrator")
@@ -525,7 +573,7 @@ elif rola == "Nauczyciel":
                 
             row_o4, row_o5 = st.columns(2)
             with row_o4:
-                kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=7) # domyślnie sprawdzian
+                kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=7)
             with row_o5:
                 waga_val = st.number_input("Waga:", min_value=1, max_value=10, value=5)
                 
