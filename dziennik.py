@@ -292,7 +292,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:46</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:51</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -369,7 +369,7 @@ if akt_zakl == "Ustawienia":
 # ================= PANEL ADMINISTRATORA =================
 elif rola == "Admin":
     st.subheader("Panel Administratora")
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4 = st.tabs(["Zastępstwa", "Oceny Zachowania", "Użytkownicy", "Wiadomości"])
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5 = st.tabs(["Zastępstwa", "Oceny Zachowania", "Użytkownicy", "Przypisania (Przedmioty)", "Wiadomości"])
     
     with adm_tab1:
         st.subheader("Zarządzanie Zastępstwami")
@@ -439,7 +439,6 @@ elif rola == "Admin":
         
         sub_adm_t1, sub_adm_t2, sub_adm_t3 = st.tabs(["➕ Dodaj użytkownika", "✏️ Edytuj użytkownika", "🗑️ Usuń użytkownika"])
         
-        # Pobranie listy uczniów do wyboru dla rodziców
         c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
         uczniowie_baza = [u[0] for u in c.fetchall()]
         if not uczniowie_baza:
@@ -484,7 +483,6 @@ elif rola == "Admin":
                     ed_rola = st.selectbox("Rola:", role_lista, index=role_lista.index(dane_u[3]) if dane_u[3] in role_lista else 0)
                     ed_klasa = st.text_input("Klasa:", value=dane_u[4])
                     
-                    # Indeks powiązanego ucznia
                     akt_pow = dane_u[5]
                     opcje_pow = ["-"] + uczniowie_baza
                     idx_pow = opcje_pow.index(akt_pow) if akt_pow in opcje_pow else 0
@@ -514,6 +512,41 @@ elif rola == "Admin":
                         st.error("Nie można usunąć głównego administratora systemowego (ID 1)!")
 
     with adm_tab4:
+        st.subheader("Przypisanie nauczyciela do przedmiotu i klasy")
+        with st.form("form_przypisz_nauczyciela"):
+            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Nauczyciel'")
+            nauczyciele_l = [n[0] for n in c.fetchall()]
+            
+            c.execute("SELECT nazwa_klasy FROM klasy")
+            klasy_l = [k[0] for k in c.fetchall()]
+            
+            p_nauczyciel = st.selectbox("Nauczyciel:", nauczyciele_l if nauczyciele_l else ["Brak"])
+            p_przedmiot = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY)
+            p_klasa = st.selectbox("Klasa:", klasy_l if klasy_l else ["1c"])
+            
+            if st.form_submit_button("Przypisz przedmiot", type="primary"):
+                if p_nauczyciel != "Brak":
+                    c.execute("INSERT INTO przypisania (nauczyciel, przedmiot, klasa) VALUES (?, ?, ?)", (p_nauczyciel, p_przedmiot, p_klasa))
+                    conn.commit()
+                    st.success("Przypisano przedmiot i nauczyciela do klasy!")
+                    st.rerun()
+                    
+        st.markdown("---")
+        st.write("### Aktualne przypisania")
+        df_przypisania = pd.read_sql("SELECT id, nauczyciel as [Nauczyciel], przedmiot as [Przedmiot], klasa as [Klasa] FROM przypisania", conn)
+        if not df_przypisania.empty:
+            st.dataframe(df_przypisania, use_container_width=True, hide_index=True)
+            with st.form("form_usun_przypisanie"):
+                id_prz_del = st.selectbox("Wybierz ID przypisania do usunięcia:", df_przypisania["id"].tolist())
+                if st.form_submit_button("Usuń przypisanie", type="primary"):
+                    c.execute("DELETE FROM przypisania WHERE id = ?", (id_prz_del,))
+                    conn.commit()
+                    st.success("Usunięto przypisanie!")
+                    st.rerun()
+        else:
+            st.info("Brak przypisań w bazie.")
+
+    with adm_tab5:
         renderuj_zakladke_wiadomosci("Administrator")
 
 # ================= PANEL NAUCZYCIELA =================
