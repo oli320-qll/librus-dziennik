@@ -127,7 +127,20 @@ WSZYSTKIE_PRZEDMIOTY = [
     "Język angielski", "Język polski", "Matematyka", "Plastyka", "Wychowanie fizyczne"
 ]
 
-KATEGORIE_OCEN = ["aktywność", "kartkówka", "odpowiedź ustna", "sprawdzian", "zadanie"]
+# Rozszerzona lista kategorii z Librusa
+KATEGORIE_OCEN = [
+    "aktywność", 
+    "inna", 
+    "kartkówka", 
+    "odpowiedź ustna", 
+    "przewidywana roczna", 
+    "przewidywana śródroczna", 
+    "roczna", 
+    "sprawdzian", 
+    "śródroczna", 
+    "zadanie", 
+    "zeszyt"
+]
 
 PELNE_GODZINY_LEKCYJNE = [
     "1 [07:10 - 07:55]",
@@ -289,7 +302,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:32</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:35</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -512,7 +525,7 @@ elif rola == "Nauczyciel":
                 
             row_o4, row_o5 = st.columns(2)
             with row_o4:
-                kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=3) # domyślnie sprawdzian
+                kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=7) # domyślnie sprawdzian
             with row_o5:
                 waga_val = st.number_input("Waga:", min_value=1, max_value=10, value=5)
                 
