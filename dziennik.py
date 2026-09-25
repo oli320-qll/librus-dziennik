@@ -57,10 +57,6 @@ st.markdown("""
     .g-2 { background-color: #d32f2f; }
     .g-1 { background-color: #b71c1c; }
     .g-0 { background-color: #757575; }
-    
-    .uwaga-poz { background-color: #d4edda; color: #155724; padding: 6px; border-left: 4px solid #28a745; margin-bottom: 5px; border-radius: 3px; }
-    .uwaga-neut { background-color: #e2e3e5; color: #383d41; padding: 6px; border-left: 4px solid #6c757d; margin-bottom: 5px; border-radius: 3px; }
-    .uwaga-neg { background-color: #f8d7da; color: #721c24; padding: 6px; border-left: 4px solid #dc3545; margin-bottom: 5px; border-radius: 3px; }
 
     .stButton>button {
         border-radius: 3px;
@@ -132,6 +128,18 @@ WSZYSTKIE_PRZEDMIOTY = [
 ]
 
 KATEGORIE_OCEN = ["aktywność", "kartkówka", "odpowiedź ustna", "sprawdzian", "zadanie"]
+
+PELNE_GODZINY_LEKCYJNE = [
+    "1 [07:10 - 07:55]",
+    "2 [08:00 - 08:45]",
+    "3 [08:55 - 09:40]",
+    "4 [09:50 - 10:35]",
+    "5 [10:45 - 11:30]",
+    "6 [11:50 - 12:35]",
+    "7 [12:45 - 13:30]",
+    "8 [13:40 - 14:25]",
+    "9 [14:30 - 15:10]"
+]
 
 def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
     c.execute("SELECT nazwa_klasy FROM klasy")
@@ -281,7 +289,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:30</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:32</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -365,7 +373,7 @@ elif rola == "Admin":
         with st.form("form_zastepstwo_adm"):
             z_data = st.date_input("Data zastępstwa:", value=date.today())
             z_klasa = st.text_input("Klasa (np. 1c):", value="1c")
-            z_nr = st.selectbox("Nr lekcji:", ["1 [07:10 - 07:55]", "2 [08:00 - 08:45]"])
+            z_nr = st.selectbox("Nr lekcji:", PELNE_GODZINY_LEKCYJNE)
             z_stary = st.text_input("Stary przedmiot:")
             z_nowy = st.text_input("Nowy przedmiot / Zmiana:")
             z_nauczyciel = st.text_input("Zastępujący nauczyciel:")
@@ -444,7 +452,7 @@ elif rola == "Nauczyciel":
             
         col_l1, col_l2 = st.columns(2)
         with col_l1:
-            nr_jednostki = st.selectbox("Nr lekcji / Godzina:", ["1 [07:10 - 07:55]", "2 [08:00 - 08:45]"])
+            nr_jednostki = st.selectbox("Nr lekcji / Godzina:", PELNE_GODZINY_LEKCYJNE)
         with col_l2:
             przedmiot_wyb = st.selectbox("Przedmiot z planu:", ["Plastyka", "Matematyka"])
             
@@ -483,21 +491,39 @@ elif rola == "Nauczyciel":
             st.success("Zapisano lekcję i frekwencję pomyślnie!")
 
     elif akt_zakl == "Oceny":
-        st.subheader("Wystawianie oceny bieżącej")
-        with st.form("form_wystaw_ocene"):
+        st.markdown("### Ocenianie uczniów — Wystawianie, edycja i poprawa ocen")
+        st.markdown("#### Wybierz przedmiot do wpisania oceny:")
+        przedmiot_docelowy = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY, label_visibility="collapsed")
+        
+        st.markdown("---")
+        st.markdown("### Dodaj ocenę (Okienko Librus)")
+        
+        with st.form("form_wystaw_ocene_librus"):
             c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
             uczniowie_l = [u[0] for u in c.fetchall()]
-            uczen_docelowy = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
-            przedmiot_docelowy = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY)
-            ocena_val = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6])
-            waga_val = st.slider("Waga oceny:", min_value=1, max_value=3, value=1)
-            kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN)
-            komentarz_val = st.text_input("Komentarz:")
-            if st.form_submit_button("Wystaw ocenę", type="primary"):
+            
+            row_o1, row_o2, row_o3 = st.columns(3)
+            with row_o1:
+                uczen_docelowy = st.selectbox("Nazwisko i imię ucznia:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
+            with row_o2:
+                ocena_val = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6], index=5)
+            with row_o3:
+                data_oceny = st.date_input("Data oceny:", value=date.today())
+                
+            row_o4, row_o5 = st.columns(2)
+            with row_o4:
+                kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=3) # domyślnie sprawdzian
+            with row_o5:
+                waga_val = st.number_input("Waga:", min_value=1, max_value=10, value=5)
+                
+            komentarz_val = st.text_area("Komentarz:")
+            
+            st.markdown("")
+            if st.form_submit_button("OK (Zapisz ocenę)", type="primary"):
                 c.execute("INSERT INTO oceny (uczen, przedmiot, ocena, waga, kategoria, data, komentarz) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                          (uczen_docelowy, przedmiot_docelowy, ocena_val, waga_val, kategoria_val, str(date.today()), komentarz_val))
+                          (uczen_docelowy, przedmiot_docelowy, ocena_val, waga_val, kategoria_val, str(data_oceny), komentarz_val))
                 conn.commit()
-                st.success("Wystawiono ocenę!")
+                st.success("Wystawiono ocenę pomyślnie!")
                 st.rerun()
 
     elif akt_zakl == "Uwagi":
