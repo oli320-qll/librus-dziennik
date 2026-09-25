@@ -71,7 +71,7 @@ st.markdown("""
 conn = sqlite3.connect("dziennik_szkolny.db", check_same_thread=False)
 c = conn.cursor()
 
-# Inicjalizacja tabel
+# Inicjalizacja tabel (tworzy tylko wtedy, gdy jeszcze ich nie ma — NIE nadpisuje istniejących danych)
 c.execute("CREATE TABLE IF NOT EXISTS uzytkownicy (id INTEGER PRIMARY KEY AUTOINCREMENT, imie_nazwisko TEXT, login TEXT, haslo TEXT, rola TEXT, klasa TEXT, powiazany_uczen TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS klasy (id INTEGER PRIMARY KEY AUTOINCREMENT, nazwa_klasy TEXT UNIQUE, wychowawca TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS przypisania (id INTEGER PRIMARY KEY AUTOINCREMENT, nauczyciel TEXT, przedmiot TEXT, klasa TEXT)")
@@ -85,7 +85,7 @@ c.execute("CREATE TABLE IF NOT EXISTS dyzury (id INTEGER PRIMARY KEY AUTOINCREME
 c.execute("CREATE TABLE IF NOT EXISTS oceny_zachowania (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, okres TEXT, ocena TEXT, opis TEXT)")
 conn.commit()
 
-# Bezpieczna migracja kolumn
+# Bezpieczna migracja kolumn dla istniejących baz
 migracje = [
     ("oceny", "kategoria", "TEXT"),
     ("oceny", "komentarz", "TEXT"),
@@ -99,7 +99,7 @@ for tabela, kolumna, typ in migracje:
     except sqlite3.OperationalError:
         pass
 
-# Dane domyślne startowe oraz pełna lista uczniów dla klasy 1c
+# Dane startowe uruchamiane TYLKO w przypadku pustej bazy
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
 if c.fetchone()[0] == 0:
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Administrator", "admin", "admin123", "Admin", "-", "-"))
@@ -215,11 +215,9 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
                 val_str = str(row.ocena)
                 waga = int(row.waga)
                 
-                # Obsługa klas css dla badge
                 css_klasa = f"g-{val_str}" if val_str in ["0", "1", "2", "3", "4", "5", "6"] else "g-np"
                 badge_list.append(f'<span class="grade-badge {css_klasa}">{val_str}</span>')
                 
-                # Liczenie średniej (pomijamy 'np' oraz wartości nienumeryczne)
                 if val_str.isdigit():
                     val = int(val_str)
                     if val > 0:
@@ -326,7 +324,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 12:10</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 12:40</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -403,39 +401,50 @@ if akt_zakl == "Ustawienia":
 # ================= PANEL ADMINISTRATORA =================
 elif rola == "Admin":
     st.subheader("Panel Administratora")
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6, adm_tab7 = st.tabs(["Zastępstwa", "Oceny Zachowania", "Użytkownicy", "Przypisania", "📅 Plan lekcji", "🛡️ Dyżury", "Wiadomości"])
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6, adm_tab7 = st.tabs(["Zastępstwa / Odwołania", "Oceny Zachowania", "Użytkownicy", "Przypisania", "📅 Plan lekcji", "🛡️ Dyżury", "Wiadomości"])
     
     with adm_tab1:
-        st.subheader("Zarządzanie Zastępstwami")
-        with st.form("form_zastepstwo_adm"):
-            z_data = st.date_input("Data zastępstwa:", value=date.today())
-            z_klasa = st.text_input("Klasa (np. 1c):", value="1c")
-            z_nr = st.selectbox("Nr lekcji:", PELNE_GODZINY_LEKCYJNE)
-            z_stary = st.text_input("Stary przedmiot:")
-            z_nowy = st.text_input("Nowy przedmiot / Zmiana:")
-            z_nauczyciel = st.text_input("Zastępujący nauczyciel:")
-            z_info = st.text_input("Informacja / Komentarz:")
-            if st.form_submit_button("Dodaj zastępstwo", type="primary"):
-                c.execute("INSERT INTO zastepstwa (data, klasa, nr_lekcji, stary_przedmiot, nowy_przedmiot, nauczyciel, informacja) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                          (str(z_data), z_klasa, z_nr, z_stary, z_nowy, z_nauczyciel, z_info))
-                conn.commit()
-                st.success("Dodano zastępstwo!")
-                st.rerun()
+        st.subheader("Zarządzanie Zastępstwami i Odwołaniami Lekcji")
+        
+        tryb_zast = st.radio("Wybierz akcję:", ["Dodaj zastępstwo / odwołanie", "Usuń zastępstwo / odwołanie"], horizontal=True)
+        
+        if tryb_zast == "Dodaj zastępstwo / odwołanie":
+            with st.form("form_zastepstwo_adm"):
+                z_data = st.date_input("Data:", value=date.today())
+                z_klasa = st.text_input("Klasa (np. 1c):", value="1c")
+                z_nr = st.selectbox("Nr lekcji:", PELNE_GODZINY_LEKCYJNE)
+                z_stary = st.text_input("Stary przedmiot (z planu):")
                 
-        st.markdown("---")
-        st.write("### Usuwanie zastępstw")
-        df_zast_all = pd.read_sql("SELECT id, data as [Data], klasa as [Klasa], nr_lekcji as [Lekcja], nowy_przedmiot as [Zmiana] FROM zastepstwa", conn)
-        if not df_zast_all.empty:
-            st.dataframe(df_zast_all, use_container_width=True, hide_index=True)
-            with st.form("form_usun_zastepstwo"):
-                id_zast_del = st.selectbox("Wybierz ID zastępstwa do usunięcia:", df_zast_all["id"].tolist())
-                if st.form_submit_button("Usuń zastępstwo", type="primary"):
-                    c.execute("DELETE FROM zastepstwa WHERE id = ?", (id_zast_del,))
+                typ_zmiany = st.selectbox("Rodzaj zmiany:", ["Zastępstwo / Zmiana przedmiotu", "🚫 Odwołanie lekcji"])
+                
+                if typ_zmiany == "🚫 Odwołanie lekcji":
+                    z_nowy = "Lekcja odwołana"
+                    z_nauczyciel = "-"
+                    z_info = st.text_input("Informacja o odwołaniu (np. Nieobecność nauczyciela):", value="Lekcja odwołana")
+                else:
+                    z_nowy = st.text_input("Nowy przedmiot:")
+                    z_nauczyciel = st.text_input("Zastępujący nauczyciel:")
+                    z_info = st.text_input("Informacja / Komentarz:")
+                    
+                if st.form_submit_button("Zapisz w systemiue", type="primary"):
+                    c.execute("INSERT INTO zastepstwa (data, klasa, nr_lekcji, stary_przedmiot, nowy_przedmiot, nauczyciel, informacja) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                              (str(z_data), z_klasa, z_nr, z_stary, z_nowy, z_nauczyciel, z_info))
                     conn.commit()
-                    st.success("Usunięto zastępstwo!")
+                    st.success("Zapisano wpis w systemie!")
                     st.rerun()
         else:
-            st.info("Brak zastępstw w bazie.")
+            df_zast_all = pd.read_sql("SELECT id, data as [Data], klasa as [Klasa], nr_lekcji as [Lekcja], nowy_przedmiot as [Zmiana], informacja as [Info] FROM zastepstwa", conn)
+            if not df_zast_all.empty:
+                st.dataframe(df_zast_all, use_container_width=True, hide_index=True)
+                with st.form("form_usun_zastepstwo"):
+                    id_zast_del = st.selectbox("Wybierz ID wpisu do usunięcia (cofnięcie odwołania/zastępstwa):", df_zast_all["id"].tolist())
+                    if st.form_submit_button("Usuń wpis / Przywróć plan", type="primary"):
+                        c.execute("DELETE FROM zastepstwa WHERE id = ?", (id_zast_del,))
+                        conn.commit()
+                        st.success("Usunięto wpis! Przywrócono pierwotny stan lekcji.")
+                        st.rerun()
+            else:
+                st.info("Brak aktywnych zastępstw lub odwołań w bazie.")
 
     with adm_tab2:
         st.subheader("Zarządzanie Ocenami z Zachowania")
