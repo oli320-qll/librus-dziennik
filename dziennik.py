@@ -57,6 +57,7 @@ st.markdown("""
     .g-2 { background-color: #d32f2f; }
     .g-1 { background-color: #b71c1c; }
     .g-0 { background-color: #757575; }
+    .g-np { background-color: #607d8b; }
 
     .stButton>button {
         border-radius: 3px;
@@ -74,7 +75,7 @@ c = conn.cursor()
 c.execute("CREATE TABLE IF NOT EXISTS uzytkownicy (id INTEGER PRIMARY KEY AUTOINCREMENT, imie_nazwisko TEXT, login TEXT, haslo TEXT, rola TEXT, klasa TEXT, powiazany_uczen TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS klasy (id INTEGER PRIMARY KEY AUTOINCREMENT, nazwa_klasy TEXT UNIQUE, wychowawca TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS przypisania (id INTEGER PRIMARY KEY AUTOINCREMENT, nauczyciel TEXT, przedmiot TEXT, klasa TEXT)")
-c.execute("CREATE TABLE IF NOT EXISTS oceny (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, przedmiot TEXT, ocena INTEGER, waga INTEGER, kategoria TEXT, data TEXT, komentarz TEXT)")
+c.execute("CREATE TABLE IF NOT EXISTS oceny (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, przedmiot TEXT, ocena TEXT, waga INTEGER, kategoria TEXT, data TEXT, komentarz TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS frekwencja (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, data TEXT, lekcja TEXT, status TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS wiadomosci (id INTEGER PRIMARY KEY AUTOINCREMENT, nadawca TEXT, odbiorca TEXT, temat TEXT, tresc TEXT, data TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS uwagi (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, nauczyciel TEXT, typ TEXT, tresc TEXT, data TEXT)")
@@ -98,13 +99,12 @@ for tabela, kolumna, typ in migracje:
     except sqlite3.OperationalError:
         pass
 
-# Dane domyślne startowe oraz pełna lista uczniów dla klasy 1c z obrazka
+# Dane domyślne startowe oraz pełna lista uczniów dla klasy 1c
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
 if c.fetchone()[0] == 0:
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Administrator", "admin", "admin123", "Admin", "-", "-"))
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Olivier", "olivier", "admin123", "Nauczyciel", "1c", "-"))
     
-    # Uczniowie z klasy 1c
     uczniowie_1c_start = [
         ("Emilia Widomska", "emilia", "emilia123"),
         ("Adam Nowak", "brak", "brak"),
@@ -153,7 +153,7 @@ WSZYSTKIE_PRZEDMIOTY = [
 
 KATEGORIE_OCEN = [
     "aktywność", "inna", "kartkówka", "odpowiedź ustna", 
-    "przewidywana roczna", "przewidywana śródroczna", 
+    "praca na lekcji", "przewidywana roczna", "przewidywana śródroczna", 
     "roczna", "sprawdzian", "śródroczna", "zadanie", "zeszyt"
 ]
 
@@ -212,12 +212,19 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
             suma_wazona = 0
             suma_wag = 0
             for row in df_oceny_p.itertuples():
-                val = int(row.ocena)
+                val_str = str(row.ocena)
                 waga = int(row.waga)
-                if val > 0:
-                    suma_wazona += val * waga
-                    suma_wag += waga
-                badge_list.append(f'<span class="grade-badge g-{val}">{val}</span>')
+                
+                # Obsługa klas css dla badge
+                css_klasa = f"g-{val_str}" if val_str in ["0", "1", "2", "3", "4", "5", "6"] else "g-np"
+                badge_list.append(f'<span class="grade-badge {css_klasa}">{val_str}</span>')
+                
+                # Liczenie średniej (pomijamy 'np' oraz wartości nienumeryczne)
+                if val_str.isdigit():
+                    val = int(val_str)
+                    if val > 0:
+                        suma_wazona += val * waga
+                        suma_wag += waga
             okres_1_html = " ".join(badge_list)
             if suma_wag > 0:
                 srednia_p = round(suma_wazona / suma_wag, 2)
@@ -319,7 +326,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 11:56</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 12:10</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -724,7 +731,17 @@ elif rola == "Nauczyciel":
                 for idx, uczen_row in enumerate(uczniowie_klasy, 1):
                     u_nazwisko = uczen_row[0]
                     df_oceny_u = pd.read_sql("SELECT ocena FROM oceny WHERE uczen = ? AND przedmiot = ?", conn, params=(u_nazwisko, wybrany_przedmiot))
-                    badge_str = " ".join([f'<span class="grade-badge g-{int(r.ocena)}">{int(r.ocena)}</span>' for r in df_oceny_u.itertuples()]) if not df_oceny_u.empty else '<span style="color: gray;">Brak ocen</span>'
+                    
+                    if not df_oceny_u.empty:
+                        badge_list = []
+                        for r in df_oceny_u.itertuples():
+                            v_str = str(r.ocena)
+                            cls = f"g-{v_str}" if v_str in ["0", "1", "2", "3", "4", "5", "6"] else "g-np"
+                            badge_list.append(f'<span class="grade-badge {cls}">{v_str}</span>')
+                        badge_str = " ".join(badge_list)
+                    else:
+                        badge_str = '<span style="color: gray;">Brak ocen</span>'
+                        
                     tabela_wiersze.append({
                         "Nr": idx,
                         "Nazwisko i imię": u_nazwisko,
@@ -745,7 +762,7 @@ elif rola == "Nauczyciel":
                 with row_o1:
                     uczen_docelowy = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Brak"])
                 with row_o2:
-                    ocena_val = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6], index=5)
+                    ocena_val = st.selectbox("Ocena:", ["0", "1", "2", "3", "4", "5", "6", "np"], index=5)
                 with row_o3:
                     data_oceny = st.date_input("Data oceny:", value=date.today())
                     
@@ -781,7 +798,12 @@ elif rola == "Nauczyciel":
                     with st.form("form_edytuj_ocene_dokladnie"):
                         st.write(f"**Uczeń:** {wybrana_o_dane[0]} | **Przedmiot:** {wybrana_o_dane[1]}")
                         e_kat = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=KATEGORIE_OCEN.index(wybrana_o_dane[4]) if wybrana_o_dane[4] in KATEGORIE_OCEN else 0)
-                        e_ocena = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6], index=[1, 2, 3, 4, 5, 6].index(wybrana_o_dane[2]) if wybrana_o_dane[2] in [1, 2, 3, 4, 5, 6] else 5)
+                        
+                        mozliwe_oceny = ["0", "1", "2", "3", "4", "5", "6", "np"]
+                        akt_ocena_str = str(wybrana_o_dane[2])
+                        idx_oceny = mozliwe_oceny.index(akt_ocena_str) if akt_ocena_str in mozliwe_oceny else 5
+                        
+                        e_ocena = st.selectbox("Ocena:", mozliwe_oceny, index=idx_oceny)
                         e_waga = st.number_input("Waga:", min_value=1, max_value=10, value=int(wybrana_o_dane[3]))
                         e_komentarz = st.text_area("Komentarz:", value=wybrana_o_dane[6] if wybrana_o_dane[6] else "")
                         
