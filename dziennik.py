@@ -82,19 +82,21 @@ c.execute("CREATE TABLE IF NOT EXISTS plan_lekcji (id INTEGER PRIMARY KEY AUTOIN
 c.execute("CREATE TABLE IF NOT EXISTS zastepstwa (id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT, klasa TEXT, nr_lekcji TEXT, stary_przedmiot TEXT, nowy_przedmiot TEXT, nauczyciel TEXT, informacja TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS dyzury (id INTEGER PRIMARY KEY AUTOINCREMENT, osoba TEXT, miejsce TEXT, dzien TEXT, godzina TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS oceny_zachowania (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, okres TEXT, ocena TEXT, opis TEXT)")
+conn.commit()
 
-# Bezpieczna migracja kolumn
-try:
-    c.execute("ALTER TABLE oceny ADD COLUMN kategoria TEXT")
-    conn.commit()
-except sqlite3.OperationalError:
-    pass
-
-try:
-    c.execute("ALTER TABLE oceny ADD COLUMN komentarz TEXT")
-    conn.commit()
-except sqlite3.OperationalError:
-    pass
+# Bezpieczna migracja kolumn (dodaje brakujące kolumny, jeśli baza już istniała)
+migracje = [
+    ("oceny", "kategoria", "TEXT"),
+    ("oceny", "komentarz", "TEXT"),
+    ("uzytkownicy", "klasa", "TEXT"),
+    ("uzytkownicy", "powiazany_uczen", "TEXT")
+]
+for tabela, kolumna, typ in migracje:
+    try:
+        c.execute(f"ALTER TABLE {tabela} ADD COLUMN {kolumna} {typ}")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
 
 # Dane domyślne startowe
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
@@ -287,7 +289,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:37</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:42</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -489,7 +491,7 @@ elif rola == "Admin":
             with st.form("form_usun_uzytkownika"):
                 id_u_del = st.selectbox("Wybierz ID użytkownika do usunięcia:", df_u_del["id"].tolist() if not df_u_del.empty else [0])
                 if st.form_submit_button("Usuń użytkownika", type="primary"):
-                    if id_u_del > 1: # Zabezpieczenie głównego admina (ID 1)
+                    if id_u_del > 1:
                         c.execute("DELETE FROM uzytkownicy WHERE id = ?", (id_u_del,))
                         conn.commit()
                         st.success("Usunięto użytkownika!")
