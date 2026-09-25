@@ -98,12 +98,26 @@ for tabela, kolumna, typ in migracje:
     except sqlite3.OperationalError:
         pass
 
-# Dane domyślne startowe
+# Dane domyślne startowe oraz pełna lista uczniów dla klasy 1c z obrazka
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
 if c.fetchone()[0] == 0:
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Administrator", "admin", "admin123", "Admin", "-", "-"))
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Olivier", "olivier", "admin123", "Nauczyciel", "1c", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Emilia Widomska", "emilia", "emilia123", "Uczeń", "1c", "-"))
+    
+    # Uczniowie z klasy 1c
+    uczniowie_1c_start = [
+        ("Emilia Widomska", "emilia", "emilia123"),
+        ("Adam Nowak", "brak", "brak"),
+        ("Barbara Kozakowska", "brak", "brak"),
+        ("Katarzyna Nowakówna", "brak", "brak"),
+        ("Łucja Widomska", "brak", "brak"),
+        ("Adam Kazimierz", "brak", "brak"),
+        ("Kacper Opolski", "brak", "brak")
+    ]
+    for u_imie, u_log, u_has in uczniowie_1c_start:
+        c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", 
+                  (u_imie, u_log, u_has, "Uczeń", "1c", "-"))
+                  
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Jan Widomski", "rodzic_emilia", "rodzic123", "Rodzic", "1c", "Emilia Widomska"))
     c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c", "Olivier"))
     conn.commit()
@@ -128,6 +142,9 @@ if "dziennik_rola" not in st.session_state:
     st.session_state["dziennik_rola"] = None
 if "librus_aktywna_zakladka" not in st.session_state:
     st.session_state["librus_aktywna_zakladka"] = "Interfejs"
+
+if "lekcja_temat" not in st.session_state:
+    st.session_state["lekcja_temat"] = "Wprowadzenie do nowego działu"
 
 WSZYSTKIE_PRZEDMIOTY = [
     "Biologia", "Chemia", "Fizyka", "Geografia", "Historia", "Informatyka", 
@@ -302,7 +319,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 11:39</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 11:56</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -630,17 +647,26 @@ elif rola == "Nauczyciel":
         
         col_d1, col_d2 = st.columns(2)
         with col_d1:
-            data_lekcji = st.date_input("Data lekcji:", value=date.today())
+            data_lekcji = st.date_input("Data lekcji:", value=date.today(), key="in_data_lekcji")
         with col_d2:
-            klasa_wyb = st.selectbox("Klasa:", ["1c"])
+            klasa_wyb = st.selectbox("Klasa:", ["1c"], key="in_klasa_lekcji")
             
         col_l1, col_l2 = st.columns(2)
         with col_l1:
-            nr_jednostki = st.selectbox("Nr lekcji / Godzina:", PELNE_GODZINY_LEKCYJNE)
+            nr_jednostki = st.selectbox("Nr lekcji / Godzina:", PELNE_GODZINY_LEKCYJNE, key="in_nr_lekcji")
         with col_l2:
-            przedmiot_wyb = st.selectbox("Przedmiot z planu:", WSZYSTKIE_PRZEDMIOTY)
+            przedmiot_wyb = st.selectbox("Przedmiot z planu:", WSZYSTKIE_PRZEDMIOTY, key="in_przedmiot_lekcji")
             
-        temat_lekcji = st.text_input("Temat lekcji:", value="Wprowadzenie do nowego działu")
+        def update_temat():
+            st.session_state["lekcja_temat"] = st.session_state["widget_temat_input"]
+
+        temat_lekcji = st.text_input(
+            "Temat lekcji:", 
+            value=st.session_state["lekcja_temat"], 
+            key="widget_temat_input", 
+            on_change=update_temat
+        )
+        st.session_state["lekcja_temat"] = temat_lekcji
         
         st.markdown("---")
         st.markdown("### Sprawdź obecność uczniów na klasie")
@@ -672,7 +698,7 @@ elif rola == "Nauczyciel":
                 c.execute("INSERT INTO frekwencja (uczen, data, lekcja, status) VALUES (?, ?, ?, ?)",
                           (uczen, str(data_lekcji), nr_jednostki, status))
             conn.commit()
-            st.success("Zapisano lekcję i frekwencję pomyślnie!")
+            st.success("Zapisano lekcję i frekwencję pomyślnie! Temat zapamiętany w dzienniku.")
 
     elif akt_zakl == "Oceny":
         st.markdown("### Dziennik Ocen — Zarządzanie ocenami z przedmiotu")
@@ -781,19 +807,53 @@ elif rola == "Nauczyciel":
                 st.info(f"Brak ocen z przedmiotu {wybrany_przedmiot}.")
 
     elif akt_zakl == "Uwagi":
-        st.subheader("Wpisywanie uwagi")
-        with st.form("form_uwaga"):
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
-            uczniowie_l = [u[0] for u in c.fetchall()]
-            uw_uczen = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
-            uw_typ = st.selectbox("Typ:", ["Pozytywna", "Neutralna", "Negatywna"])
-            uw_tresc = st.text_area("Treść uwagi:")
-            if st.form_submit_button("Dodaj uwagę", type="primary"):
-                c.execute("INSERT INTO uwagi (uczen, nauczyciel, typ, tresc, data) VALUES (?, ?, ?, ?, ?)",
-                          (uw_uczen, user, uw_typ, uw_tresc, str(date.today())))
-                conn.commit()
-                st.success("Dodano uwagę!")
-                st.rerun()
+        st.subheader("Wpisywanie uwag (w tym tryb seryjny)")
+        
+        tryb_uwag = st.radio("Wybierz tryb wpisywania uwag:", ["Pojedyncza uwaga", "Seryjne dodawanie uwag dla całej klasy"], horizontal=True)
+        
+        if tryb_uwag == "Pojedyncza uwaga":
+            with st.form("form_uwaga_pojedyncza"):
+                c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
+                uczniowie_l = [u[0] for u in c.fetchall()]
+                uw_uczen = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
+                uw_typ = st.selectbox("Typ:", ["Pozytywna", "Neutralna", "Negatywna"])
+                uw_tresc = st.text_area("Treść uwagi:")
+                if st.form_submit_button("Dodaj uwagę", type="primary"):
+                    c.execute("INSERT INTO uwagi (uczen, nauczyciel, typ, tresc, data) VALUES (?, ?, ?, ?, ?)",
+                              (uw_uczen, user, uw_typ, uw_tresc, str(date.today())))
+                    conn.commit()
+                    st.success("Dodano uwagę!")
+                    st.rerun()
+        else:
+            with st.form("form_uwaga_seryjna"):
+                c.execute("SELECT nazwa_klasy FROM klasy")
+                klasy_s_l = [k[0] for k in c.fetchall()]
+                s_klasa = st.selectbox("Wybierz klasę do wpisów seryjnych:", klasy_s_l if klasy_s_l else ["1c"])
+                
+                s_typ = st.selectbox("Typ uwagi dla zaznaczonych:", ["Pozytywna", "Neutralna", "Negatywna"])
+                s_tresc = st.text_area("Treść uwagi (wspólna):")
+                
+                c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (s_klasa,))
+                uczniowie_w_klasie = [u[0] for u in c.fetchall()]
+                
+                st.write("Zaznacz uczniów, którym chcesz dopisać powyższą uwagę:")
+                zaznaczeni_uczniowie = {}
+                for uczen in uczniowie_w_klasie:
+                    zaznaczeni_uczniowie[uczen] = st.checkbox(uczen, value=False, key=f"ser_uw_{uczen}")
+                
+                if st.form_submit_button("Wpisz seryjnie uwagi", type="primary"):
+                    licznik = 0
+                    for uczen, zaznaczony in zaznaczeni_uczniowie.items():
+                        if zaznaczony and s_tresc.strip():
+                            c.execute("INSERT INTO uwagi (uczen, nauczyciel, typ, tresc, data) VALUES (?, ?, ?, ?, ?)",
+                                      (uczen, user, s_typ, s_tresc, str(date.today())))
+                            licznik += 1
+                    conn.commit()
+                    if licznik > 0:
+                        st.success(f"Dodano pomyślnie seryjne uwagi dla {licznik} uczniów!")
+                        st.rerun()
+                    else:
+                        st.warning("Nie zaznaczono żadnego ucznia lub treść uwagi była pusta!")
 
     elif akt_zakl == "Wiadomości":
         renderuj_zakladke_wiadomosci(user)
