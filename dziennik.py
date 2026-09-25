@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import date
 
 # ================= TRYB PRZERWY TECHNICZNEJ =================
-# Zmień na False, gdy chcesz odblokować aplikację dla użytkowników
 PRZERWA_TECHNICZNA = False
 
 if PRZERWA_TECHNICZNA:
@@ -63,8 +62,6 @@ st.markdown("""
     .uwaga-neut { background-color: #e2e3e5; color: #383d41; padding: 6px; border-left: 4px solid #6c757d; margin-bottom: 5px; border-radius: 3px; }
     .uwaga-neg { background-color: #f8d7da; color: #721c24; padding: 6px; border-left: 4px solid #dc3545; margin-bottom: 5px; border-radius: 3px; }
 
-    .zastepstwo-box { background-color: #fff3cd; color: #856404; padding: 8px; border-left: 4px solid #ffc107; margin-bottom: 5px; border-radius: 3px; font-size: 13px; }
-
     .stButton>button {
         border-radius: 3px;
         font-size: 11px;
@@ -90,7 +87,7 @@ c.execute("CREATE TABLE IF NOT EXISTS zastepstwa (id INTEGER PRIMARY KEY AUTOINC
 c.execute("CREATE TABLE IF NOT EXISTS dyzury (id INTEGER PRIMARY KEY AUTOINCREMENT, osoba TEXT, miejsce TEXT, dzien TEXT, godzina TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS oceny_zachowania (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, okres TEXT, ocena TEXT, opis TEXT)")
 
-# Bezpieczna migracja kolumn w ocenach
+# Bezpieczna migracja kolumn
 try:
     c.execute("ALTER TABLE oceny ADD COLUMN kategoria TEXT")
     conn.commit()
@@ -107,22 +104,17 @@ except sqlite3.OperationalError:
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
 if c.fetchone()[0] == 0:
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Administrator", "admin", "admin123", "Admin", "-", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Alicja Ołowniuk", "alicja", "admin123", "Nauczyciel", "7c SP5", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Olivier", "olivier", "admin123", "Nauczyciel", "1c SP5", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Emilia Nowak", "emilia", "emilia123", "Uczeń", "1c SP5", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Jan Nowak (Rodzic)", "rodzic_emilia", "rodzic123", "Rodzic", "1c SP5", "Emilia Nowak"))
-    c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("7c SP5", "Alicja Ołowniuk"))
-    c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c SP5", "Olivier"))
+    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Olivier", "olivier", "admin123", "Nauczyciel", "1c", "-"))
+    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Emilia Widomska", "emilia", "emilia123", "Uczeń", "1c", "-"))
+    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Jan Widomski", "rodzic_emilia", "rodzic123", "Rodzic", "1c", "Emilia Widomska"))
+    c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c", "Olivier"))
     conn.commit()
 
 c.execute("SELECT COUNT(*) FROM plan_lekcji")
 if c.fetchone()[0] == 0:
     domyslny_plan = [
-        ("7c SP5", "Poniedziałek", "1 [07:10 - 07:55]", "Język polski"),
-        ("7c SP5", "Poniedziałek", "2 [08:00 - 08:45]", "Matematyka"),
-        ("1c SP5", "Poniedziałek", "1 [07:10 - 07:55]", "Plastyka"),
-        ("1c SP5", "Poniedziałek", "2 [08:00 - 08:45]", "Matematyka"),
-        ("1c SP5", "Wtorek", "1 [07:10 - 07:55]", "Wychowanie fizyczne"),
+        ("1c", "Poniedziałek", "1 [07:10 - 07:55]", "Plastyka"),
+        ("1c", "Poniedziałek", "2 [08:00 - 08:45]", "Matematyka"),
     ]
     c.executemany("INSERT INTO plan_lekcji (klasa, dzien, nr_lekcji, przedmiot) VALUES (?, ?, ?, ?)", domyslny_plan)
     conn.commit()
@@ -132,22 +124,20 @@ if "dziennik_user" not in st.session_state:
 if "dziennik_rola" not in st.session_state:
     st.session_state["dziennik_rola"] = None
 if "librus_aktywna_zakladka" not in st.session_state:
-    st.session_state["librus_aktywna_zakladka"] = "Oceny"
+    st.session_state["librus_aktywna_zakladka"] = "Interfejs"
 
 WSZYSTKIE_PRZEDMIOTY = [
-    "Biologia", "Chemia", "Doradztwo zawodowe", "Edukacja zdrowotna", "Fizyka", 
-    "Geografia", "Historia", "Informatyka", "Język angielski", "Język niemiecki", 
-    "Język polski", "Matematyka", "Muzyka", "Plastyka", "Religia", "Technika", 
-    "Wychowanie fizyczne", "Zajęcia z wychowawcą", "Edukacja dla bezpieczeństwa", "Wiedza o społeczeństwie", "Edukacja wczesnoszkolna"
+    "Biologia", "Chemia", "Fizyka", "Geografia", "Historia", "Informatyka", 
+    "Język angielski", "Język polski", "Matematyka", "Plastyka", "Wychowanie fizyczne"
 ]
 
-KATEGORIE_OCEN = ["aktywność", "inna", "kartkówka", "odpowiedź ustna", "przewidywana roczna", "przewidywana śródroczna", "roczna", "sprawdzian", "śródroczna", "zadanie", "zeszyt"]
+KATEGORIE_OCEN = ["aktywność", "kartkówka", "odpowiedź ustna", "sprawdzian", "zadanie"]
 
 def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
     c.execute("SELECT nazwa_klasy FROM klasy")
     klasy_baza = [k[0] for k in c.fetchall()]
     if not klasy_baza:
-        klasy_baza = ["7c SP5"]
+        klasy_baza = ["1c"]
         
     if docelowa_klasa not in klasy_baza:
         docelowa_klasa = klasy_baza[0]
@@ -159,42 +149,27 @@ def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
         st.markdown(f"#### Klasa ucznia: **{wybrana_klasa}**")
 
     st.markdown(f"### Plan lekcji — Klasa: **{wybrana_klasa}**")
-    
     df_p = pd.read_sql("SELECT dzien, nr_lekcji, przedmiot FROM plan_lekcji WHERE klasa = ?", conn, params=(wybrana_klasa,))
     if not df_p.empty:
         pivot_plan = df_p.pivot_table(index="nr_lekcji", columns="dzien", values="przedmiot", aggfunc=lambda x: ', '.join(str(v) for v in x))
-        dni_kolejnosc = [d for d in ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek"] if d in pivot_plan.columns]
-        pozostale_dni = [d for d in pivot_plan.columns if d not in dni_kolejnosc]
-        pivot_plan = pivot_plan[dni_kolejnosc + pozostale_dni]
         st.dataframe(pivot_plan, use_container_width=True)
     else:
         st.info(f"Brak zdefiniowanego planu lekcji dla klasy {wybrana_klasa}.")
 
-    st.markdown("---")
-    st.subheader("Aktywne zastępstwa dla klasy")
-    df_zast = pd.read_sql("SELECT data as [Data], nr_lekcji as [Lekcja], stary_przedmiot as [Zastąpiony przedmiot], nowy_przedmiot as [Nowy przedmiot / Zmiana], nauczyciel as [Nauczyciel], informacja as [Uwagi] FROM zastepstwa WHERE klasa = ?", conn, params=(wybrana_klasa,))
-    if not df_zast.empty:
-        st.dataframe(df_zast, use_container_width=True, hide_index=True)
-    else:
-        st.info("Brak zaplanowanych zastępstw dla tej klasy.")
-
 def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
     c.execute("SELECT klasa FROM uzytkownicy WHERE imie_nazwisko = ?", (imie_ucznia,))
     res_k = c.fetchone()
-    klasa_ucznia = res_k[0] if res_k and res_k[0] != "-" else "1c SP5"
+    klasa_ucznia = res_k[0] if res_k and res_k[0] != "-" else "1c"
     
     c.execute("SELECT DISTINCT przedmiot FROM plan_lekcji WHERE klasa = ?", (klasa_ucznia,))
     przedmioty_klasy = [row[0] for row in c.fetchall()]
-    
     if not przedmioty_klasy:
-        przedmioty_klasy = ["Edukacja wczesnoszkolna", "Wychowanie fizyczne"]
+        przedmioty_klasy = ["Plastyka", "Matematyka"]
 
     st.markdown(f"### Oceny bieżące i szczegóły (Klasa: {klasa_ucznia})")
-    
     tabela_dane = []
     for przedm in przedmioty_klasy:
         df_oceny_p = pd.read_sql("SELECT ocena, waga FROM oceny WHERE uczen = ? AND przedmiot = ?", conn, params=(imie_ucznia, przedm))
-        
         okres_1_html = ""
         srednia_p = "-"
         if not df_oceny_p.empty:
@@ -207,7 +182,7 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
                 if val > 0:
                     suma_wazona += val * waga
                     suma_wag += waga
-                badge_list.append(f'<span class="grade-badge g-{val}" title="Ocena: {val}">({val})</span>' if val==0 else f'<span class="grade-badge g-{val}">{val}</span>')
+                badge_list.append(f'<span class="grade-badge g-{val}">{val}</span>')
             okres_1_html = " ".join(badge_list)
             if suma_wag > 0:
                 srednia_p = round(suma_wazona / suma_wag, 2)
@@ -216,59 +191,22 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
             
         tabela_dane.append({
             "Przedmiot": przedm,
-            "Okres 1 (Oceny bieżące)": okres_1_html,
-            "Śr. 1": srednia_p,
-            "Okres 2 (Oceny bieżące)": '<span style="color: gray; font-size: 12px;">Brak ocen</span>',
-            "Śr. 2": "-",
-            "Śr. R": srednia_p
+            "Oceny bieżące": okres_1_html,
+            "Średnia": srednia_p
         })
-    
     df_librus = pd.DataFrame(tabela_dane)
     st.write(df_librus.to_html(escape=False, index=False), unsafe_allow_html=True)
-
+    
     st.markdown("---")
-    st.subheader("Szczegóły ocen (Kategoria, Waga, Komentarz nauczyciela)")
+    st.subheader("Szczegóły ocen")
     df_szczegoly = pd.read_sql("SELECT data as [Data], przedmiot as [Przedmiot], ocena as [Ocena], kategoria as [Kategoria], waga as [Waga], komentarz as [Komentarz] FROM oceny WHERE uczen = ?", conn, params=(imie_ucznia,))
     if not df_szczegoly.empty:
         st.dataframe(df_szczegoly, use_container_width=True, hide_index=True)
     else:
-        st.info("Brak szczegółowych wpisów ocen.")
-
-def renderuj_uwagi_dla_osoby(imie_osoby):
-    st.subheader(f"Uwagi o uczniu / zachowaniu")
-    df_uw = pd.read_sql("SELECT data as [Data], typ as [Typ], nauczyciel as [Nauczyciel], tresc as [Treść uwagi] FROM uwagi WHERE uczen = ?", conn, params=(imie_osoby,))
-    if not df_uw.empty:
-        for idx, row in df_uw.iterrows():
-            t_typ = row["Typ"]
-            css_klasa = "uwaga-poz" if t_typ == "Pozytywna" else ("uwaga-neg" if t_typ == "Negatywna" else "uwaga-neut")
-            st.markdown(f"""
-                <div class="{css_klasa}">
-                    <b>[{row['Data']}] Typ: {t_typ}</b> (Nauczyciel: {row['Nauczyciel']})<br>
-                    {row['Treść uwagi']}
-                </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("Brak wpisanych uwag.")
-
-    st.markdown("---")
-    st.subheader("Oceny z zachowania")
-    df_zach = pd.read_sql("SELECT okres as [Okres], ocena as [Ocena z zachowania], opis as [Uzasadnienie] FROM oceny_zachowania WHERE uczen = ?", conn, params=(imie_osoby,))
-    if not df_zach.empty:
-        st.dataframe(df_zach, use_container_width=True, hide_index=True)
-    else:
-        st.info("Brak wystawionych ocen z zachowania.")
-
-def renderuj_panel_dyzurow():
-    st.subheader("Harmonogram Dyżurów (Nauczycielskie / Korytarzowe)")
-    df_dyz = pd.read_sql("SELECT dzien as [Dzień], godzina as [Godzina / Przerwa], miejsce as [Miejsce / Sektor], osoba as [Osoba pełniąca dyżur] FROM dyzury", conn)
-    if not df_dyz.empty:
-        st.dataframe(df_dyz, use_container_width=True, hide_index=True)
-    else:
-        st.info("Brak zaplanowanych dyżurów w systemie.")
+        st.info("Brak szczegółów ocen.")
 
 def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
     st.subheader("Skrzynka wiadomości")
-    
     c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE imie_nazwisko != ?", (aktualny_uzytkownik,))
     osoby = [o[0] for o in c.fetchall()]
     
@@ -300,28 +238,13 @@ def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
                     </div>
                 """, unsafe_allow_html=True)
                 
-                col_btn_odp, col_btn_del = st.columns([4, 1])
+                col_btn_del, _ = st.columns([1, 4])
                 with col_btn_del:
-                    # Przycisk usuwania otrzymanej wiadomości
                     if st.button("🗑️ Usuń", key=f"del_msg_{row['id']}"):
                         c.execute("DELETE FROM wiadomosci WHERE id = ?", (row['id'],))
                         conn.commit()
                         st.success("Wiadomość została usunięta!")
                         st.rerun()
-                
-                with st.form(f"form_odpowiedz_{row['id']}"):
-                    st.text(f"Odpowiedz do: {row['Od']}")
-                    odp_tresc = st.text_area("Treść odpowiedzi:", key=f"odp_text_{row['id']}")
-                    if st.form_submit_button("Wyślij odpowiedź", type="secondary"):
-                        if odp_tresc.strip():
-                            temat_odp = f"RE: {row['Temat']}"
-                            c.execute("INSERT INTO wiadomosci (nadawca, odbiorca, temat, tresc, data) VALUES (?, ?, ?, ?, ?)",
-                                      (aktualny_uzytkownik, row['Od'], temat_odp, odp_tresc, str(date.today())))
-                            conn.commit()
-                            st.success("Odpowiedź została wysłana!")
-                            st.rerun()
-                        else:
-                            st.warning("Treść odpowiedzi nie może być pusta!")
     else:
         st.info("Brak wiadomości w skrzynce odbiorczej.")
 
@@ -358,46 +281,45 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-24 18:00</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:30</div>
     </div>
 """, unsafe_allow_html=True)
 
 cols_ikony = st.columns(9)
 with cols_ikony[0]:
-    if st.button("&#127968;\nInterfejs", use_container_width=True):
+    if st.button("🏠 Interfejs", use_container_width=True):
         st.session_state["librus_aktywna_zakladka"] = "Interfejs"
         st.rerun()
 with cols_ikony[1]:
-    btn_label = "&#128214;\nLekcja (N)" if st.session_state["dziennik_rola"] == "Nauczyciel" else "&#128214;\nLekcja"
-    if st.button(btn_label, use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Realizacja" if st.session_state["dziennik_rola"] == "Nauczyciel" else "Plan"
+    if st.button("📖 Lekcja", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Realizacja"
         st.rerun()
 with cols_ikony[2]:
-    if st.button("&#128202;\nOceny", use_container_width=True):
+    if st.button("📊 Oceny", use_container_width=True):
         st.session_state["librus_aktywna_zakladka"] = "Oceny"
         st.rerun()
 with cols_ikony[3]:
-    if st.button("&#9888;\nUwagi", use_container_width=True):
+    if st.button("⚠️ Uwagi", use_container_width=True):
         st.session_state["librus_aktywna_zakladka"] = "Uwagi"
         st.rerun()
 with cols_ikony[4]:
-    if st.button("&#128203;\nFrekwencja", use_container_width=True):
+    if st.button("📋 Frekwencja", use_container_width=True):
         st.session_state["librus_aktywna_zakladka"] = "Frekwencja"
         st.rerun()
 with cols_ikony[5]:
-    if st.button("&#9993;\nWiadomości", use_container_width=True):
+    if st.button("✉️ Wiadomości", use_container_width=True):
         st.session_state["librus_aktywna_zakladka"] = "Wiadomości"
         st.rerun()
 with cols_ikony[6]:
-    if st.button("&#128197;\nPlan/Zast.", use_container_width=True):
+    if st.button("📅 Plan/Zast.", use_container_width=True):
         st.session_state["librus_aktywna_zakladka"] = "Plan"
         st.rerun()
 with cols_ikony[7]:
-    if st.button("&#9881;\nUstawienia", use_container_width=True):
+    if st.button("⚙️ Ustawienia", use_container_width=True):
         st.session_state["librus_aktywna_zakladka"] = "Ustawienia"
         st.rerun()
 with cols_ikony[8]:
-    if st.button("&#128682;\nWyloguj", use_container_width=True):
+    if st.button("🚪 Wyloguj", use_container_width=True):
         st.session_state["dziennik_user"] = None
         st.session_state["dziennik_rola"] = None
         st.rerun()
@@ -411,10 +333,8 @@ st.markdown(f"""
 st.divider()
 
 akt_zakl = st.session_state["librus_aktywna_zakladka"]
-
-c.execute("SELECT klasa FROM uzytkownicy WHERE imie_nazwisko = ?", (st.session_state["dziennik_user"],))
-res_u_klasa = c.fetchone()
-moja_klasa = res_u_klasa[0] if res_u_klasa and res_u_klasa[0] != "-" else "7c SP5"
+rola = st.session_state["dziennik_rola"]
+user = st.session_state["dziennik_user"]
 
 # ================= OBSŁUGA ZAKŁADKI USTAWIENIA =================
 if akt_zakl == "Ustawienia":
@@ -423,390 +343,248 @@ if akt_zakl == "Ustawienia":
         st_haslo_stare = st.text_input("Aktualne hasło:", type="password")
         st_haslo_nowe = st.text_input("Nowe hasło:", type="password")
         st_haslo_nowe_powt = st.text_input("Powtórz nowe hasło:", type="password")
-        
-        btn_zmien = st.form_submit_button("Zmień hasło", type="primary")
-        if btn_zmien:
-            c.execute("SELECT haslo FROM uzytkownicy WHERE imie_nazwisko = ?", (st.session_state["dziennik_user"],))
+        if st.form_submit_button("Zmień hasło", type="primary"):
+            c.execute("SELECT haslo FROM uzytkownicy WHERE imie_nazwisko = ?", (user,))
             db_haslo = c.fetchone()[0]
             if st_haslo_stare != db_haslo:
                 st.error("Podane aktualne hasło jest niepoprawne!")
-            elif not st_haslo_nowe or len(st_haslo_nowe) < 4:
-                st.error("Nowe hasło musi mieć co najmniej 4 znaki!")
             elif st_haslo_nowe != st_haslo_nowe_powt:
                 st.error("Nowe hasła nie zgadzają się!")
             else:
-                c.execute("UPDATE uzytkownicy SET haslo = ? WHERE imie_nazwisko = ?", (st_haslo_nowe, st.session_state["dziennik_user"]))
+                c.execute("UPDATE uzytkownicy SET haslo = ? WHERE imie_nazwisko = ?", (st_haslo_nowe, user))
                 conn.commit()
                 st.success("Hasło zostało pomyślnie zmienione!")
 
-# ================= 1. PANEL ADMINISTRATORA =================
-elif st.session_state["dziennik_rola"] == "Admin":
-    st.subheader("Panel Administratora — Zarządzanie Szkołą")
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6 = st.tabs(["Klasy", "Użytkownicy", "Plan Lekcji", "Zastępstwa i Dyżury", "Przypisania", "Wiadomości"])
+# ================= PANEL ADMINISTRATORA =================
+elif rola == "Admin":
+    st.subheader("Panel Administratora")
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4 = st.tabs(["Zastępstwa", "Oceny Zachowania", "Użytkownicy", "Wiadomości"])
     
     with adm_tab1:
-        with st.form("form_klasa"):
-            k_nazwa = st.text_input("Nazwa nowej klasy (np. 1c SP5):")
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Nauczyciel'")
-            nauczyciele_l = [n[0] for n in c.fetchall()]
-            k_wych = st.selectbox("Wychowawca:", nauczyciele_l) if nauczyciele_l else ""
-            if st.form_submit_button("Utwórz klasę", type="primary"):
-                try:
-                    c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", (k_nazwa, k_wych))
-                    conn.commit()
-                    st.success(f"Dodano klasę {k_nazwa}!")
-                    st.rerun()
-                except: st.error("Taka klasa już istnieje!")
-        
-        st.markdown("---")
-        st.write("### Lista klas i usuwanie klas")
-        df_klasy_adm = pd.read_sql("SELECT id, nazwa_klasy as [Klasa], wychowawca as [Wychowawca] FROM klasy", conn)
-        if not df_klasy_adm.empty:
-            st.dataframe(df_klasy_adm, use_container_width=True, hide_index=True)
-            with st.form("form_usun_klase"):
-                klasa_id_do_usuniecia = st.selectbox("Wybierz ID klasy do usunięcia:", df_klasy_adm["id"].tolist())
-                btn_usun_k = st.form_submit_button("Usuń wybraną klasę", type="primary")
-                if btn_usun_k:
-                    c.execute("DELETE FROM klasy WHERE id = ?", (klasa_id_do_usuniecia,))
-                    conn.commit()
-                    st.success(f"Usunięto klasę o ID: {klasa_id_do_usuniecia}!")
-                    st.rerun()
-        else:
-            st.info("Brak zdefiniowanych klas.")
-
-    with adm_tab2:
-        with st.form("form_user"):
-            st.write("### Dodaj nowego użytkownika")
-            u_imie = st.text_input("Imię i nazwisko:")
-            u_login = st.text_input("Login:")
-            u_haslo = st.text_input("Hasło:", type="password")
-            u_rola = st.selectbox("Rola:", ["Uczeń", "Rodzic", "Nauczyciel", "Admin"])
-            c.execute("SELECT nazwa_klasy FROM klasy")
-            klasy_l = [k[0] for k in c.fetchall()]
-            u_klasa = st.selectbox("Klasa:", ["-"] + klasy_l)
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
-            uczniowie_l = [uc[0] for uc in c.fetchall()]
-            u_powiazanie = st.selectbox("Powiązany uczeń (dla Rodzica):", ["-"] + uczniowie_l)
-            
-            if st.form_submit_button("Utwórz konto", type="primary"):
-                try:
-                    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", 
-                              (u_imie, u_login, u_haslo, u_rola, u_klasa, u_powiazanie))
-                    conn.commit()
-                    st.success(f"Utworzono konto dla {u_imie}!")
-                    st.rerun()
-                except: st.error("Ten login jest już zajęty!")
-        
-        st.markdown("---")
-        st.write("### Lista użytkowników, edycja i usuwanie")
-        df_users_adm = pd.read_sql("SELECT id, imie_nazwisko as [Imię i Nazwisko], login as [Login], haslo as [Hasło], rola as [Rola], klasa as [Klasa], powiazany_uczen as [Powiązany uczeń] FROM uzytkownicy", conn)
-        if not df_users_adm.empty:
-            st.dataframe(df_users_adm, use_container_width=True, hide_index=True)
-            
-            st.markdown("#### Edycja danych użytkownika")
-            wybrany_id_edycji = st.selectbox("Wybierz ID użytkownika do edycji:", df_users_adm["id"].tolist(), key="sel_ed_u_id")
-            
-            c.execute("SELECT imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen FROM uzytkownicy WHERE id = ?", (wybrany_id_edycji,))
-            akt_dane_u = c.fetchone()
-            
-            with st.form("form_edytuj_uzytkownika"):
-                ed_imie = st.text_input("Imię i nazwisko:", value=akt_dane_u[0] if akt_dane_u else "")
-                ed_login = st.text_input("Login:", value=akt_dane_u[1] if akt_dane_u else "")
-                ed_haslo = st.text_input("Hasło:", value=akt_dane_u[2] if akt_dane_u else "")
-                
-                role_opcje = ["Uczeń", "Rodzic", "Nauczyciel", "Admin"]
-                akt_rola_idx = role_opcje.index(akt_dane_u[3]) if akt_dane_u and akt_dane_u[3] in role_opcje else 0
-                ed_rola = st.selectbox("Rola:", role_opcje, index=akt_rola_idx)
-                
-                c.execute("SELECT nazwa_klasy FROM klasy")
-                klasy_l_ed = [k[0] for k in c.fetchall()]
-                klasy_wybor = ["-"] + klasy_l_ed
-                akt_klasa_idx = klasy_wybor.index(akt_dane_u[4]) if akt_dane_u and akt_dane_u[4] in klasy_wybor else 0
-                ed_klasa = st.selectbox("Klasa:", klasy_wybor, index=akt_klasa_idx)
-                
-                c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
-                uczniowie_l_ed = ["-"] + [uc[0] for uc in c.fetchall()]
-                akt_pow_idx = uczniowie_l_ed.index(akt_dane_u[5]) if akt_dane_u and akt_dane_u[5] in uczniowie_l_ed else 0
-                ed_powiazanie = st.selectbox("Powiązany uczeń (dla Rodzica):", uczniowie_l_ed, index=akt_pow_idx)
-                
-                btn_zapisz_edycje_u = st.form_submit_button("Zapisz zmiany użytkownika", type="primary")
-                if btn_zapisz_edycje_u:
-                    try:
-                        c.execute("UPDATE uzytkownicy SET imie_nazwisko = ?, login = ?, haslo = ?, rola = ?, klasa = ?, powiazany_uczen = ? WHERE id = ?",
-                                      (ed_imie, ed_login, ed_haslo, ed_rola, ed_klasa, ed_powiazanie, wybrany_id_edycji))
-                        conn.commit()
-                        st.success("Dane użytkownika zostały pomyślnie zaktualizowane!")
-                        st.rerun()
-                    except sqlite3.IntegrityError:
-                        st.error("Podany login jest już zajęty przez innego użytkownika!")
-
-            st.markdown("---")
-            with st.form("form_usun_uzytkownika"):
-                st.write("#### Usuwanie użytkownika")
-                user_id_do_usuniecia = st.selectbox("Wybierz ID użytkownika do usunięcia:", df_users_adm["id"].tolist(), key="del_u_sel")
-                btn_usun_u = st.form_submit_button("Usuń wybranego użytkownika", type="primary")
-                if btn_usun_u:
-                    c.execute("DELETE FROM uzytkownicy WHERE id = ?", (user_id_do_usuniecia,))
-                    conn.commit()
-                    st.success(f"Usunięto użytkownika o ID: {user_id_do_usuniecia}!")
-                    st.rerun()
-
-    with adm_tab3:
-        st.subheader("Edycja Planu Lekcji (Dodawanie i Usuwanie wpisów)")
-        with st.form("form_plan"):
-            c.execute("SELECT nazwa_klasy FROM klasy")
-            klasy_p = [k[0] for k in c.fetchall()]
-            p_klasa = st.selectbox("Wybierz klasę:", klasy_p if klasy_p else ["1c SP5"])
-            p_dzien = st.selectbox("Dzień tygodnia:", ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek"])
-            p_nr = st.selectbox("Nr lekcji / Godzina:", [
-                "1 [07:10 - 07:55]", "2 [08:00 - 08:45]", "3 [08:50 - 09:35]", 
-                "4 [09:45 - 10:30]", "5 [10:40 - 11:25]", "6 [11:40 - 12:25]"
-            ])
-            p_przedmiot = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY)
-            if st.form_submit_button("Dodaj do planu", type="primary"):
-                c.execute("INSERT INTO plan_lekcji (klasa, dzien, nr_lekcji, przedmiot) VALUES (?, ?, ?, ?)", (p_klasa, p_dzien, p_nr, p_przedmiot))
-                conn.commit()
-                st.success("Dodano lekcję do planu!")
-                st.rerun()
-
-        st.markdown("---")
-        renderuj_tabelue_planu_dla_klasy("1c SP5", allow_change=True)
-
-        st.markdown("---")
-        st.write("### Usuwanie lekcji z planu")
-        df_plan_all = pd.read_sql("SELECT id, klasa as [Klasa], dzien as [Dzień], nr_lekcji as [Lekcja], przedmiot as [Przedmiot] FROM plan_lekcji", conn)
-        if not df_plan_all.empty:
-            st.dataframe(df_plan_all, use_container_width=True, hide_index=True)
-            with st.form("form_usun_lekcje_z_planu"):
-                plan_id_do_usuniecia = st.selectbox("Wybierz ID wpisu planu do usunięcia:", df_plan_all["id"].tolist())
-                btn_usun_pl = st.form_submit_button("Usuń wybraną lekcję z planu", type="primary")
-                if btn_usun_pl:
-                    c.execute("DELETE FROM plan_lekcji WHERE id = ?", (plan_id_do_usuniecia,))
-                    conn.commit()
-                    st.success(f"Usunięto lekcję o ID: {plan_id_do_usuniecia}!")
-                    st.rerun()
-        else:
-            st.info("Brak lekcji w planie.")
-
-    with adm_tab4:
         st.subheader("Zarządzanie Zastępstwami")
         with st.form("form_zastepstwo_adm"):
             z_data = st.date_input("Data zastępstwa:", value=date.today())
-            c.execute("SELECT nazwa_klasy FROM klasy")
-            klasy_z = [k[0] for k in c.fetchall()]
-            z_klasa = st.selectbox("Klasa:", klasy_z if klasy_z else ["1c SP5"])
-            z_nr = st.selectbox("Nr lekcji:", ["1 [07:10 - 07:55]", "2 [08:00 - 08:45]", "3 [08:50 - 09:35]", "4 [09:45 - 10:30]"])
-            z_stary = st.text_input("Zastąpiony przedmiot (np. Matematyka):")
-            z_nowy = st.text_input("Nowy przedmiot / Zmiana (np. Zastępstwo / Informatyka):")
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Nauczyciel'")
-            nauczyciele_z = [n[0] for n in c.fetchall()]
-            z_nauczyciel = st.selectbox("Nauczyciel prowadzący:", nauczyciele_z if nauczyciele_z else ["-"])
-            z_info = st.text_input("Informacja / Komentarz (np. Odwołane, Sala 12):")
-            
+            z_klasa = st.text_input("Klasa (np. 1c):", value="1c")
+            z_nr = st.selectbox("Nr lekcji:", ["1 [07:10 - 07:55]", "2 [08:00 - 08:45]"])
+            z_stary = st.text_input("Stary przedmiot:")
+            z_nowy = st.text_input("Nowy przedmiot / Zmiana:")
+            z_nauczyciel = st.text_input("Zastępujący nauczyciel:")
+            z_info = st.text_input("Informacja / Komentarz:")
             if st.form_submit_button("Dodaj zastępstwo", type="primary"):
                 c.execute("INSERT INTO zastepstwa (data, klasa, nr_lekcji, stary_przedmiot, nowy_przedmiot, nauczyciel, informacja) VALUES (?, ?, ?, ?, ?, ?, ?)",
                           (str(z_data), z_klasa, z_nr, z_stary, z_nowy, z_nauczyciel, z_info))
                 conn.commit()
                 st.success("Dodano zastępstwo!")
                 st.rerun()
-
-    with adm_tab5:
-        st.subheader("Przypisania Nauczycieli do Przedmiotów i Klas")
-        with st.form("form_przypisanie"):
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Nauczyciel'")
-            nauczyciele_p = [n[0] for n in c.fetchall()]
-            pr_nauczyciel = st.selectbox("Nauczyciel:", nauczyciele_p if nauczyciele_p else ["-"])
-            pr_przedmiot = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY)
-            c.execute("SELECT nazwa_klasy FROM klasy")
-            klasy_p = [k[0] for k in c.fetchall()]
-            pr_klasa = st.selectbox("Klasa:", klasy_p if klasy_p else ["1c SP5"])
-            
-            if st.form_submit_button("Zapisz przypisanie", type="primary"):
-                c.execute("INSERT INTO przypisania (nauczyciel, przedmiot, klasa) VALUES (?, ?, ?)", (pr_nauczyciel, pr_przedmiot, pr_klasa))
-                conn.commit()
-                st.success("Zapisano przypisanie nauczyciela!")
-                st.rerun()
-
-    with adm_tab6:
-        renderuj_zakladke_wiadomosci("Administrator")
-
-# ================= 2. PANEL NAUCZYCIELA =================
-elif st.session_state["dziennik_rola"] == "Nauczyciel":
-    nauczyciel_zalogowany = st.session_state["dziennik_user"]
-    st.subheader(f"Panel Nauczyciela — {nauczyciel_zalogowany}")
-    
-    n_tab1, n_tab2, n_tab3, n_tab4, n_tab5, n_tab6, n_tab7 = st.tabs([
-        "Realizacja lekcji", "Wystawianie Ocen", "Frekwencja", "Uwagi i Zachowanie", "Plan i Dyżury", "Zastępstwa", "Wiadomości"
-    ])
-    
-    with n_tab1:
-        st.subheader("Dziennik lekcyjny — Wpis tematu i obecności")
-        c.execute("SELECT DISTINCT klasa, przedmiot FROM przypisania WHERE nauczyciel = ?", (nauczyciel_zalogowany,))
-        przypisane_lekcje = c.fetchall()
-        
-        if przypisane_lekcje:
-            opcje_lekcji = [f"{kl} — {przh}" for kl, przh in przypisane_lekcje]
-            wybrana_lekcja = st.selectbox("Wybierz przedmiot i klasę:", opcje_lekcji)
-            w_klasa, w_przedmiot = wybrana_lekcja.split(" — ")
-            
-            with st.form("form_realizacja_lekcji"):
-                data_lekcji = st.date_input("Data lekcji:", value=date.today())
-                nr_jednostki = st.selectbox("Numer lekcji:", ["1 [07:10 - 07:55]", "2 [08:00 - 08:45]", "3 [08:50 - 09:35]", "4 [09:45 - 10:30]", "5 [10:40 - 11:25]"])
-                temat_lekcji = st.text_input("Temat lekcji:")
                 
-                st.write("### Sprawdzenie frekwencji uczniów w klasie")
-                c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (w_klasa,))
-                uczniowie_klas = c.fetchall()
-                
-                frekwencja_slownik = {}
-                if uczniowie_klas:
-                    for uczen in uczniowie_klas:
-                        status_obecnosci = st.selectbox(f"{uczen[0]}", ["Obecny", "Nieobecny", "Spóźniony", "Usprawiedliwiony"], key=f"freq_{uczen[0]}")
-                        frekwencja_slownik[uczen[0]] = status_obecnosci
-                else:
-                    st.info("Brak uczniów przypisanych do tej klasy.")
-                
-                if st.form_submit_button("Zapisz lekcję i frekwencję", type="primary"):
-                    for uczen, status in frekwencja_slownik.items():
-                        c.execute("INSERT INTO frekwencja (uczen, data, lekcja, status) VALUES (?, ?, ?, ?)",
-                                  (uczen, str(data_lekcji), nr_jednostki, status))
-                    conn.commit()
-                    st.success("Zapisano temat lekcji oraz frekwencję uczniów!")
-        else:
-            st.info("Nie masz jeszcze przypisanych żadnych przedmiotów i klas przez Administratora.")
-
-    with n_tab2:
-        st.subheader("Wystawianie oceny bieżącej")
-        with st.form("form_wystaw_ocene"):
-            c.execute("SELECT DISTINCT klasa FROM przypisania WHERE nauczyciel = ?", (nauczyciel_zalogowany,))
-            klasy_nauczyciela = [k[0] for k in c.fetchall()]
-            wybrana_klasa_ocena = st.selectbox("Wybierz klasę:", klasy_nauczyciela if klasy_nauczyciela else ["1c SP5"])
-            
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (wybrana_klasa_ocena,))
-            uczniowie_w_klasie = [u[0] for u in c.fetchall()]
-            uczen_docelowy = st.selectbox("Uczeń:", uczniowie_w_klasie if uczniowie_w_klasie else ["Brak"])
-            
-            c.execute("SELECT DISTINCT przedmiot FROM przypisania WHERE nauczyciel = ? AND klasa = ?", (nauczyciel_zalogowany, wybrana_klasa_ocena))
-            przedmioty_nauczyciela = [p[0] for p in c.fetchall()]
-            przedmiot_docelowy = st.selectbox("Przedmiot:", przedmioty_nauczyciela if przedmioty_nauczyciela else WSZYSTKIE_PRZEDMIOTY)
-            
-            ocena_val = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6])
-            waga_val = st.slider("Waga oceny:", min_value=1, max_value=3, value=1)
-            kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN)
-            komentarz_val = st.text_input("Komentarz / Opis oceny:")
-            data_oceny = st.date_input("Data wystawienia:", value=date.today())
-            
-            if st.form_submit_button("Wystaw ocenę", type="primary"):
-                if uczen_docelowy != "Brak":
-                    c.execute("INSERT INTO oceny (uczen, przedmiot, ocena, waga, kategoria, data, komentarz) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                              (uczen_docelowy, przedmiot_docelowy, ocena_val, waga_val, kategoria_val, str(data_oceny), komentarz_val))
-                    conn.commit()
-                    st.success(f"Wystawiono ocenę {ocena_val} dla ucznia {uczen_docelowy}!")
-                    st.rerun()
-                else:
-                    st.error("Brak ucznia w wybranej klasie.")
-
-    with n_tab3:
-        st.subheader("Historia i zestawienie frekwencji")
-        c.execute("SELECT uczen as [Uczeń], data as [Data], lekcja as [Lekcja], status as [Status] FROM frekwencja")
-        df_fr = c.fetchall()
-        if df_fr:
-            st.dataframe(pd.DataFrame(df_fr, columns=["Uczeń", "Data", "Lekcja", "Status"]), use_container_width=True, hide_index=True)
-        else:
-            st.info("Brak wpisów frekwencji.")
-
-    with n_tab4:
-        st.subheader("Wpisywanie uwagi o zachowaniu / postępach")
-        with st.form("form_uwaga"):
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
-            wszyscy_uczniowie = [u[0] for u in c.fetchall()]
-            uw_uczen = st.selectbox("Wybierz ucznia:", wszyscy_uczniowie if wszyscy_uczniowie else ["Brak"])
-            uw_typ = st.selectbox("Typ uwagi:", ["Pozytywna", "Neutralna", "Negatywna"])
-            uw_tresc = st.text_area("Treść uwagi:")
-            
-            if st.form_submit_button("Dodaj uwagę", type="primary"):
-                if uw_uczen != "Brak" and uw_tresc.strip():
-                    c.execute("INSERT INTO uwagi (uczen, nauczyciel, typ, tresc, data) VALUES (?, ?, ?, ?, ?)",
-                              (uw_uczen, nauczyciel_zalogowany, uw_typ, uw_tresc, str(date.today())))
-                    conn.commit()
-                    st.success("Dodano uwagę pomyślnie!")
-                    st.rerun()
-                else:
-                    st.error("Uzupełnij treść uwagi.")
-
-    with n_tab5:
-        renderuj_tabelue_planu_dla_klasy(moja_klasa, allow_change=True)
         st.markdown("---")
-        renderuj_panel_dyzurow()
-
-    with n_tab6:
-        st.subheader("Zastępstwa w szkole")
-        df_z_all = pd.read_sql("SELECT data as [Data], klasa as [Klasa], nr_lekcji as [Lekcja], stary_przedmiot as [Stary przedmiot], nowy_przedmiot as [Nowy przedmiot], nauczyciel as [Nauczyciel], informacja as [Informacje] FROM zastepstwa", conn)
-        if not df_z_all.empty:
-            st.dataframe(df_z_all, use_container_width=True, hide_index=True)
+        st.write("### Usuwanie zastępstw")
+        df_zast_all = pd.read_sql("SELECT id, data as [Data], klasa as [Klasa], nr_lekcji as [Lekcja], nowy_przedmiot as [Zmiana] FROM zastepstwa", conn)
+        if not df_zast_all.empty:
+            st.dataframe(df_zast_all, use_container_width=True, hide_index=True)
+            with st.form("form_usun_zastepstwo"):
+                id_zast_del = st.selectbox("Wybierz ID zastępstwa do usunięcia:", df_zast_all["id"].tolist())
+                if st.form_submit_button("Usuń zastępstwo", type="primary"):
+                    c.execute("DELETE FROM zastepstwa WHERE id = ?", (id_zast_del,))
+                    conn.commit()
+                    st.success("Usunięto zastępstwo!")
+                    st.rerun()
         else:
             st.info("Brak zastępstw w bazie.")
 
-    with n_tab7:
-        renderuj_zakladke_wiadomosci(nauczyciel_zalogowany)
+    with adm_tab2:
+        st.subheader("Zarządzanie Ocenami z Zachowania")
+        with st.form("form_dodaj_zachowanie"):
+            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
+            uczniowie_l = [u[0] for u in c.fetchall()]
+            z_uczen = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Brak"])
+            z_okres = st.selectbox("Okres:", ["I okres", "II okres", "Roczna"])
+            z_ocena_z = st.selectbox("Ocena z zachowania:", ["Wzorowe", "Bardzo dobre", "Dobre", "Poprawne", "Nieodpowiednie", "Naganne"])
+            z_opis = st.text_area("Uzasadnienie / Opis:")
+            if st.form_submit_button("Dodaj ocenę z zachowania", type="primary"):
+                if z_uczen != "Brak":
+                    c.execute("INSERT INTO oceny_zachowania (uczen, okres, ocena, opis) VALUES (?, ?, ?, ?)", (z_uczen, z_okres, z_ocena_z, z_opis))
+                    conn.commit()
+                    st.success("Dodano ocenę z zachowania!")
+                    st.rerun()
 
-# ================= 3. PANEL UCZNIA =================
-elif st.session_state["dziennik_rola"] == "Uczeń":
-     uczen_zalogowany = st.session_state["dziennik_user"]
-     st.subheader(f"Panel Ucznia — {uczen_zalogowany}")
-     
-     u_tab1, u_tab2, u_tab3, u_tab4, u_tab5 = st.tabs(["Oceny", "Plan lekcji", "Uwagi i Zachowanie", "Frekwencja", "Wiadomości"])
-     
-     with u_tab1:
-         renderuj_tabelue_ocen_dla_ucznia(uczen_zalogowany)
-         
-     with u_tab2:
-         renderuj_tabelue_planu_dla_klasy(moja_klasa)
-         
-     with u_tab3:
-         renderuj_uwagi_dla_osoby(uczen_zalogowany)
-         
-     with u_tab4:
-         st.subheader("Moja frekwencja")
-         df_f_ucz = pd.read_sql("SELECT data as [Data], lekcja as [Lekcja], status as [Status] FROM frekwencja WHERE uczen = ?", conn, params=(uczen_zalogowany,))
-         if not df_f_ucz.empty:
-             st.dataframe(df_f_ucz, use_container_width=True, hide_index=True)
-         else:
-             st.info("Brak wpisów frekwencji.")
-             
-     with u_tab5:
-         renderuj_zakladke_wiadomosci(uczen_zalogowany)
+        st.markdown("---")
+        st.write("### Usuwanie ocen z zachowania")
+        df_zach_all = pd.read_sql("SELECT id, uczen as [Uczeń], okres as [Okres], ocena as [Ocena] FROM oceny_zachowania", conn)
+        if not df_zach_all.empty:
+            st.dataframe(df_zach_all, use_container_width=True, hide_index=True)
+            with st.form("form_usun_zachowanie"):
+                id_zach_del = st.selectbox("Wybierz ID wpisu do usunięcia:", df_zach_all["id"].tolist())
+                if st.form_submit_button("Usuń ocenę z zachowania", type="primary"):
+                    c.execute("DELETE FROM oceny_zachowania WHERE id = ?", (id_zach_del,))
+                    conn.commit()
+                    st.success("Usunięto wpis!")
+                    st.rerun()
+        else:
+            st.info("Brak ocen z zachowania w bazie.")
 
-# ================= 4. PANEL RODZICA =================
-elif st.session_state["dziennik_rola"] == "Rodzic":
-    rodzic_zalogowany = st.session_state["dziennik_user"]
-    c.execute("SELECT powiazany_uczen FROM uzytkownicy WHERE imie_nazwisko = ?", (rodzic_zalogowany,))
+    with adm_tab3:
+        st.subheader("Lista Użytkowników")
+        df_u = pd.read_sql("SELECT id, imie_nazwisko as [Imię i Nazwisko], login as [Login], rola as [Rola], klasa as [Klasa] FROM uzytkownicy", conn)
+        st.dataframe(df_u, use_container_width=True, hide_index=True)
+
+    with adm_tab4:
+        renderuj_zakladke_wiadomosci("Administrator")
+
+# ================= PANEL NAUCZYCIELA =================
+elif rola == "Nauczyciel":
+    if akt_zakl == "Interfejs" or akt_zakl == "Realizacja":
+        st.markdown("### Realizacja programu nauczania — Dziennik lekcyjny i Frekwencja")
+        
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            data_lekcji = st.date_input("Data lekcji:", value=date.today())
+        with col_d2:
+            klasa_wyb = st.selectbox("Klasa:", ["1c"])
+            
+        col_l1, col_l2 = st.columns(2)
+        with col_l1:
+            nr_jednostki = st.selectbox("Nr lekcji / Godzina:", ["1 [07:10 - 07:55]", "2 [08:00 - 08:45]"])
+        with col_l2:
+            przedmiot_wyb = st.selectbox("Przedmiot z planu:", ["Plastyka", "Matematyka"])
+            
+        temat_lekcji = st.text_input("Temat lekcji:", value="Wprowadzenie do nowego działu")
+        
+        st.markdown("---")
+        st.markdown("### Sprawdź obecność uczniów na klasie")
+        
+        c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (klasa_wyb,))
+        uczniowie_klas = c.fetchall()
+        
+        frekwencja_wyniki = {}
+        if uczniowie_klas:
+            for idx, uczen in enumerate(uczniowie_klas, 1):
+                col_u_name, col_u_radio = st.columns([2, 5])
+                with col_u_name:
+                    st.write(f"{idx}. {uczen[0]}")
+                with col_u_radio:
+                    status = st.radio(
+                        f"st_{uczen[0]}", 
+                        ["ob", "nb", "u", "sp", "zw"], 
+                        horizontal=True, 
+                        label_visibility="collapsed", 
+                        key=f"radio_freq_{uczen[0]}"
+                    )
+                    frekwencja_wyniki[uczen[0]] = status
+        else:
+            st.info("Brak uczniów w tej klasie.")
+            
+        st.markdown("")
+        if st.button("Zapisz lekcję i frekwencję", type="primary"):
+            for uczen, status in frekwencja_wyniki.items():
+                c.execute("INSERT INTO frekwencja (uczen, data, lekcja, status) VALUES (?, ?, ?, ?)",
+                          (uczen, str(data_lekcji), nr_jednostki, status))
+            conn.commit()
+            st.success("Zapisano lekcję i frekwencję pomyślnie!")
+
+    elif akt_zakl == "Oceny":
+        st.subheader("Wystawianie oceny bieżącej")
+        with st.form("form_wystaw_ocene"):
+            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
+            uczniowie_l = [u[0] for u in c.fetchall()]
+            uczen_docelowy = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
+            przedmiot_docelowy = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY)
+            ocena_val = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6])
+            waga_val = st.slider("Waga oceny:", min_value=1, max_value=3, value=1)
+            kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN)
+            komentarz_val = st.text_input("Komentarz:")
+            if st.form_submit_button("Wystaw ocenę", type="primary"):
+                c.execute("INSERT INTO oceny (uczen, przedmiot, ocena, waga, kategoria, data, komentarz) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                          (uczen_docelowy, przedmiot_docelowy, ocena_val, waga_val, kategoria_val, str(date.today()), komentarz_val))
+                conn.commit()
+                st.success("Wystawiono ocenę!")
+                st.rerun()
+
+    elif akt_zakl == "Uwagi":
+        st.subheader("Wpisywanie uwagi")
+        with st.form("form_uwaga"):
+            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
+            uczniowie_l = [u[0] for u in c.fetchall()]
+            uw_uczen = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
+            uw_typ = st.selectbox("Typ:", ["Pozytywna", "Neutralna", "Negatywna"])
+            uw_tresc = st.text_area("Treść uwagi:")
+            if st.form_submit_button("Dodaj uwagę", type="primary"):
+                c.execute("INSERT INTO uwagi (uczen, nauczyciel, typ, tresc, data) VALUES (?, ?, ?, ?, ?)",
+                          (uw_uczen, user, uw_typ, uw_tresc, str(date.today())))
+                conn.commit()
+                st.success("Dodano uwagę!")
+                st.rerun()
+
+    elif akt_zakl == "Wiadomości":
+        renderuj_zakladke_wiadomosci(user)
+
+    elif akt_zakl == "Plan":
+        renderuj_tabelue_planu_dla_klasy("1c", allow_change=True)
+        
+    elif akt_zakl == "Frekwencja":
+        st.subheader("Zestawienie frekwencji")
+        df_fr = pd.read_sql("SELECT uczen as [Uczeń], data as [Data], lekcja as [Lekcja], status as [Status] FROM frekwencja", conn)
+        if not df_fr.empty:
+            st.dataframe(df_fr, use_container_width=True, hide_index=True)
+        else:
+            st.info("Brak wpisów frekwencji.")
+
+# ================= PANEL UCZNIA =================
+elif rola == "Uczeń":
+    if akt_zakl == "Oceny" or akt_zakl == "Interfejs":
+        renderuj_tabelue_ocen_dla_ucznia(user)
+    elif akt_zakl == "Plan":
+        renderuj_tabelue_planu_dla_klasy("1c")
+    elif akt_zakl == "Wiadomości":
+        renderuj_zakladke_wiadomosci(user)
+    elif akt_zakl == "Uwagi":
+        st.subheader("Moje uwagi i zachowanie")
+        df_uw = pd.read_sql("SELECT data as [Data], typ as [Typ], nauczyciel as [Nauczyciel], tresc as [Treść] FROM uwagi WHERE uczen = ?", conn, params=(user,))
+        if not df_uw.empty:
+            st.dataframe(df_uw, use_container_width=True, hide_index=True)
+        else:
+            st.info("Brak uwag.")
+            
+        st.markdown("---")
+        st.subheader("Oceny z zachowania")
+        df_oz = pd.read_sql("SELECT okres as [Okres], ocena as [Ocena], opis as [Opis] FROM oceny_zachowania WHERE uczen = ?", conn, params=(user,))
+        if not df_oz.empty:
+            st.dataframe(df_oz, use_container_width=True, hide_index=True)
+        else:
+            st.info("Brak ocen z zachowania.")
+    elif akt_zakl == "Frekwencja":
+        st.subheader("Moja frekwencja")
+        df_f_ucz = pd.read_sql("SELECT data as [Data], lekcja as [Lekcja], status as [Status] FROM frekwencja WHERE uczen = ?", conn, params=(user,))
+        if not df_f_ucz.empty:
+            st.dataframe(df_f_ucz, use_container_width=True, hide_index=True)
+        else:
+            st.info("Brak wpisów frekwencji.")
+
+# ================= PANEL RODZICA =================
+elif rola == "Rodzic":
+    c.execute("SELECT powiazany_uczen FROM uzytkownicy WHERE imie_nazwisko = ?", (user,))
     res_p = c.fetchone()
-    dziecko = res_p[0] if res_p and res_p[0] != "-" else "Emilia Nowak"
+    dziecko = res_p[0] if res_p and res_p[0] != "-" else "Emilia Widomska"
     
     st.subheader(f"Panel Rodzica — Podgląd dziecka: **{dziecko}**")
     
-    r_tab1, r_tab2, r_tab3, r_tab4, r_tab5 = st.tabs(["Oceny dziecka", "Plan lekcji", "Uwagi i Zachowanie", "Frekwencja", "Wiadomości"])
-    
-    with r_tab1:
+    if akt_zakl == "Oceny" or akt_zakl == "Interfejs":
         renderuj_tabelue_ocen_dla_ucznia(dziecko)
-        
-    with r_tab2:
-        c.execute("SELECT klasa FROM uzytkownicy WHERE imie_nazwisko = ?", (dziecko,))
-        res_dk = c.fetchone()
-        klasa_dziecka = res_dk[0] if res_dk and res_dk[0] != "-" else "1c SP5"
-        renderuj_tabelue_planu_dla_klasy(klasa_dziecka)
-        
-    with r_tab3:
-        renderuj_uwagi_dla_osoby(dziecko)
-        
-    with r_tab4:
+    elif akt_zakl == "Plan":
+        renderuj_tabelue_planu_dla_klasy("1c")
+    elif akt_zakl == "Uwagi":
+        st.subheader(f"Uwagi o uczniu: {dziecko}")
+        df_uw = pd.read_sql("SELECT data as [Data], typ as [Typ], nauczyciel as [Nauczyciel], tresc as [Treść] FROM uwagi WHERE uczen = ?", conn, params=(dziecko,))
+        if not df_uw.empty:
+            st.dataframe(df_uw, use_container_width=True, hide_index=True)
+        else:
+            st.info("Brak uwag.")
+    elif akt_zakl == "Frekwencja":
         st.subheader(f"Frekwencja ucznia: {dziecko}")
         df_f_d = pd.read_sql("SELECT data as [Data], lekcja as [Lekcja], status as [Status] FROM frekwencja WHERE uczen = ?", conn, params=(dziecko,))
         if not df_f_d.empty:
             st.dataframe(df_f_d, use_container_width=True, hide_index=True)
         else:
-            st.info("Brak wpisów frekwencji dla dziecka.")
-            
-    with r_tab5:
-        renderuj_zakladke_wiadomosci(rodzic_zalogowany)
+            st.info("Brak wpisów frekwencji.")
+    elif akt_zakl == "Wiadomości":
+        renderuj_zakladke_wiadomosci(user)
