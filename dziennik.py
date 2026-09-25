@@ -292,7 +292,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 10:51</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 11:12</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -436,7 +436,6 @@ elif rola == "Admin":
 
     with adm_tab3:
         st.subheader("Zarządzanie Użytkownikami")
-        
         sub_adm_t1, sub_adm_t2, sub_adm_t3 = st.tabs(["➕ Dodaj użytkownika", "✏️ Edytuj użytkownika", "🗑️ Usuń użytkownika"])
         
         c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
@@ -601,40 +600,111 @@ elif rola == "Nauczyciel":
             st.success("Zapisano lekcję i frekwencję pomyślnie!")
 
     elif akt_zakl == "Oceny":
-        st.markdown("### Ocenianie uczniów — Wystawianie, edycja i poprawa ocen")
-        st.markdown("#### Wybierz przedmiot do wpisania oceny:")
-        przedmiot_docelowy = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY, label_visibility="collapsed")
+        st.markdown("### Dziennik Ocen — Zarządzanie ocenami z przedmiotu")
         
+        # Wybór przedmiotu i klasy przez nauczyciela
+        col_op1, col_op2 = st.columns(2)
+        with col_op1:
+            wybrany_przedmiot = st.selectbox("Wybierz przedmiot:", WSZYSTKIE_PRZEDMIOTY)
+        with col_op2:
+            c.execute("SELECT nazwa_klasy FROM klasy")
+            klasy_baza = [k[0] for k in c.fetchall()]
+            wybrana_klasa = st.selectbox("Wybierz klasę:", klasy_baza if klasy_baza else ["1c"])
+
         st.markdown("---")
-        st.markdown("### Dodaj ocenę (Okienko Librus)")
-        
-        with st.form("form_wystaw_ocene_librus"):
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
-            uczniowie_l = [u[0] for u in c.fetchall()]
+        nauczyciel_tabs = st.tabs(["📋 Widok tabeli ocen (Librus)", "➕ Wystaw nową ocenę", "✏️ Edytuj / Popraw / Usuń ocenę"])
+
+        with nauczyciel_tabs[0]:
+            st.subheader(f"Tabela ocen z przedmiotu: {wybrany_przedmiot} (Klasa: {wybrana_klasa})")
+            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (wybrana_klasa,))
+            uczniowie_klasy = c.fetchall()
             
-            row_o1, row_o2, row_o3 = st.columns(3)
-            with row_o1:
-                uczen_docelowy = st.selectbox("Nazwisko i imię ucznia:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
-            with row_o2:
-                ocena_val = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6], index=5)
-            with row_o3:
-                data_oceny = st.date_input("Data oceny:", value=date.today())
+            if uczniowie_klasy:
+                tabela_wiersze = []
+                for idx, uczen_row in enumerate(uczniowie_klasy, 1):
+                    u_nazwisko = uczen_row[0]
+                    df_oceny_u = pd.read_sql("SELECT ocena FROM oceny WHERE uczen = ? AND przedmiot = ?", conn, params=(u_nazwisko, wybrany_przedmiot))
+                    badge_str = " ".join([f'<span class="grade-badge g-{int(r.ocena)}">{int(r.ocena)}</span>' for r in df_oceny_u.itertuples()]) if not df_oceny_u.empty else '<span style="color: gray;">Brak ocen</span>'
+                    tabela_wiersze.append({
+                        "Nr": idx,
+                        "Nazwisko i imię": u_nazwisko,
+                        "Oceny bieżące": badge_str
+                    })
+                df_widok = pd.DataFrame(tabela_wiersze)
+                st.write(df_widok.to_html(escape=False, index=False), unsafe_allow_html=True)
+            else:
+                st.info("Brak uczniów w wybranej klasie.")
+
+        with nauczyciel_tabs[1]:
+            st.subheader("Wystawianie oceny")
+            with st.form("form_wystaw_ocene_librus"):
+                c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (wybrana_klasa,))
+                uczniowie_l = [u[0] for u in c.fetchall()]
                 
-            row_o4, row_o5 = st.columns(2)
-            with row_o4:
-                kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=7)
-            with row_o5:
-                waga_val = st.number_input("Waga:", min_value=1, max_value=10, value=5)
+                row_o1, row_o2, row_o3 = st.columns(3)
+                with row_o1:
+                    uczen_docelowy = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Brak"])
+                with row_o2:
+                    ocena_val = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6], index=5)
+                with row_o3:
+                    data_oceny = st.date_input("Data oceny:", value=date.today())
+                    
+                row_o4, row_o5 = st.columns(2)
+                with row_o4:
+                    kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=7)
+                with row_o5:
+                    waga_val = st.number_input("Waga:", min_value=1, max_value=10, value=5)
+                    
+                komentarz_val = st.text_area("Komentarz / Opis:")
                 
-            komentarz_val = st.text_area("Komentarz:")
+                if st.form_submit_button("OK (Zapisz ocenę)", type="primary"):
+                    if uczen_docelowy != "Brak":
+                        c.execute("INSERT INTO oceny (uczen, przedmiot, ocena, waga, kategoria, data, komentarz) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                  (uczen_docelowy, wybrany_przedmiot, ocena_val, waga_val, kategoria_val, str(data_oceny), komentarz_val))
+                        conn.commit()
+                        st.success("Wystawiono ocenę pomyślnie!")
+                        st.rerun()
+
+        with nauczyciel_tabs[2]:
+            st.subheader("Edycja, poprawa lub usuwanie istniejących ocen")
+            df_wszystkie_oceny = pd.read_sql("SELECT id, uczen as [Uczeń], przedmiot as [Przedmiot], ocena as [Ocena], kategoria as [Kategoria], data as [Data], komentarz as [Komentarz] FROM oceny WHERE przedmiot = ?", conn, params=(wybrany_przedmiot,))
             
-            st.markdown("")
-            if st.form_submit_button("OK (Zapisz ocenę)", type="primary"):
-                c.execute("INSERT INTO oceny (uczen, przedmiot, ocena, waga, kategoria, data, komentarz) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                          (uczen_docelowy, przedmiot_docelowy, ocena_val, waga_val, kategoria_val, str(data_oceny), komentarz_val))
-                conn.commit()
-                st.success("Wystawiono ocenę pomyślnie!")
-                st.rerun()
+            if not df_wszystkie_oceny.empty:
+                st.dataframe(df_wszystkie_oceny, use_container_width=True, hide_index=True)
+                
+                wybrane_id_oceny = st.selectbox("Wybierz ID oceny do edycji / usunięcia:", df_wszystkie_oceny["id"].tolist())
+                
+                c.execute("SELECT uczen, przedmiot, ocena, waga, kategoria, data, komentarz FROM oceny WHERE id = ?", (wybrane_id_oceny,))
+                wybrana_o_dane = c.fetchone()
+                
+                if wybrana_o_dane:
+                    with st.form("form_edytuj_ocene_dokladnie"):
+                        st.write(f"**Uczeń:** {wybrana_o_dane[0]} | **Przedmiot:** {wybrana_o_dane[1]}")
+                        e_kat = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=KATEGORIE_OCEN.index(wybrana_o_dane[4]) if wybrana_o_dane[4] in KATEGORIE_OCEN else 0)
+                        e_ocena = st.selectbox("Ocena:", [1, 2, 3, 4, 5, 6], index=[1, 2, 3, 4, 5, 6].index(wybrana_o_dane[2]) if wybrana_o_dane[2] in [1, 2, 3, 4, 5, 6] else 5)
+                        e_waga = st.number_input("Waga:", min_value=1, max_value=10, value=int(wybrana_o_dane[3]))
+                        e_komentarz = st.text_area("Komentarz:", value=wybrana_o_dane[6] if wybrana_o_dane[6] else "")
+                        
+                        col_btn1, col_btn2 = st.columns(2)
+                        with col_btn1:
+                            btn_zapisz_zmiany = st.form_submit_button("💾 Popraw / Zapisz zmiany", type="primary")
+                        with col_btn2:
+                            btn_usun_ocene = st.form_submit_button("🗑️ Usuń ocenę")
+                            
+                        if btn_zapisz_zmiany:
+                            c.execute("UPDATE oceny SET kategoria = ?, ocena = ?, waga = ?, komentarz = ? WHERE id = ?",
+                                      (e_kat, e_ocena, e_waga, e_komentarz, wybrane_id_oceny))
+                            conn.commit()
+                            st.success("Zaktualizowano ocenę pomyślnie!")
+                            st.rerun()
+                            
+                        if btn_usun_ocene:
+                            c.execute("DELETE FROM oceny WHERE id = ?", (wybrane_id_oceny,))
+                            conn.commit()
+                            st.success("Usunięto ocenę pomyślnie!")
+                            st.rerun()
+            else:
+                st.info(f"Brak ocen z przedmiotu {wybrany_przedmiot}.")
 
     elif akt_zakl == "Uwagi":
         st.subheader("Wpisywanie uwagi")
