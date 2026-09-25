@@ -5,7 +5,7 @@ from datetime import date
 
 # ================= TRYB PRZERWY TECHNICZNEJ =================
 # Zmień na False, gdy chcesz odblokować aplikację dla użytkowników
-PRZERWA_TECHNICZNA = True 
+PRZERWA_TECHNICZNA = False
 
 if PRZERWA_TECHNICZNA:
     st.warning("⚠️ **Przerwa techniczna!** System Librus jest obecnie niedostępny z powodu prac konserwacyjnych. Zapraszamy w godzinach od 12:00 do 14:00.")
