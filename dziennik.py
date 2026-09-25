@@ -108,6 +108,11 @@ if c.fetchone()[0] == 0:
     c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c", "Olivier"))
     conn.commit()
 
+c.execute("SELECT COUNT(*) FROM klasy")
+if c.fetchone()[0] == 0:
+    c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c", "Olivier"))
+    conn.commit()
+
 c.execute("SELECT COUNT(*) FROM plan_lekcji")
 if c.fetchone()[0] == 0:
     domyslny_plan = [
@@ -141,6 +146,8 @@ PELNE_GODZINY_LEKCYJNE = [
     "7 [12:45 - 13:30]", "8 [13:40 - 14:25]", "9 [14:30 - 15:10]"
 ]
 
+DNI_TYGODNIA = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek"]
+
 def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
     c.execute("SELECT nazwa_klasy FROM klasy")
     klasy_baza = [k[0] for k in c.fetchall()]
@@ -160,6 +167,10 @@ def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
     df_p = pd.read_sql("SELECT dzien, nr_lekcji, przedmiot FROM plan_lekcji WHERE klasa = ?", conn, params=(wybrana_klasa,))
     if not df_p.empty:
         pivot_plan = df_p.pivot_table(index="nr_lekcji", columns="dzien", values="przedmiot", aggfunc=lambda x: ', '.join(str(v) for v in x))
+        # Uporządkowanie kolumn według dni tygodnia jeśli istnieją
+        dostepne_dni = [d for d in DNI_TYGODNIA if d in pivot_plan.columns]
+        inne_dni = [d for d in pivot_plan.columns if d not in DNI_TYGODNIA]
+        pivot_plan = pivot_plan[dostepne_dni + inne_dni]
         st.dataframe(pivot_plan, use_container_width=True)
     else:
         st.info(f"Brak zdefiniowanego planu lekcji dla klasy {wybrana_klasa}.")
@@ -292,7 +303,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 11:12</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 11:31</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -369,7 +380,7 @@ if akt_zakl == "Ustawienia":
 # ================= PANEL ADMINISTRATORA =================
 elif rola == "Admin":
     st.subheader("Panel Administratora")
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5 = st.tabs(["Zastępstwa", "Oceny Zachowania", "Użytkownicy", "Przypisania (Przedmioty)", "Wiadomości"])
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6 = st.tabs(["Zastępstwa", "Oceny Zachowania", "Użytkownicy", "Przypisania", "📅 Plan lekcji", "Wiadomości"])
     
     with adm_tab1:
         st.subheader("Zarządzanie Zastępstwami")
@@ -546,6 +557,39 @@ elif rola == "Admin":
             st.info("Brak przypisań w bazie.")
 
     with adm_tab5:
+        st.subheader("Zarządzanie Planem Lekcji")
+        with st.form("form_dodaj_plan_lekcji"):
+            c.execute("SELECT nazwa_klasy FROM klasy")
+            klasy_p_l = [k[0] for k in c.fetchall()]
+            
+            pl_klasa = st.selectbox("Klasa:", klasy_p_l if klasy_p_l else ["1c"])
+            pl_dzien = st.selectbox("Dzień tygodnia:", DNI_TYGODNIA)
+            pl_nr = st.selectbox("Numer i godzina lekcji:", PELNE_GODZINY_LEKCYJNE)
+            pl_przedmiot = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY)
+            
+            if st.form_submit_button("Dodaj lekcję do planu", type="primary"):
+                c.execute("INSERT INTO plan_lekcji (klasa, dzien, nr_lekcji, przedmiot) VALUES (?, ?, ?, ?)",
+                          (pl_klasa, pl_dzien, pl_nr, pl_przedmiot))
+                conn.commit()
+                st.success("Dodano lekcję do planu!")
+                st.rerun()
+                
+        st.markdown("---")
+        st.write("### Usuwanie wpisów z planu lekcji")
+        df_plan_all = pd.read_sql("SELECT id, klasa as [Klasa], dzien as [Dzień], nr_lekcji as [Lekcja], przedmiot as [Przedmiot] FROM plan_lekcji", conn)
+        if not df_plan_all.empty:
+            st.dataframe(df_plan_all, use_container_width=True, hide_index=True)
+            with st.form("form_usun_plan_wpis"):
+                id_pl_del = st.selectbox("Wybierz ID wpisu do usunięcia:", df_plan_all["id"].tolist())
+                if st.form_submit_button("Usuń wpis", type="primary"):
+                    c.execute("DELETE FROM plan_lekcji WHERE id = ?", (id_pl_del,))
+                    conn.commit()
+                    st.success("Usunięto wpis z planu!")
+                    st.rerun()
+        else:
+            st.info("Brak wpisów w planie lekcji.")
+
+    with adm_tab6:
         renderuj_zakladke_wiadomosci("Administrator")
 
 # ================= PANEL NAUCZYCIELA =================
@@ -563,7 +607,7 @@ elif rola == "Nauczyciel":
         with col_l1:
             nr_jednostki = st.selectbox("Nr lekcji / Godzina:", PELNE_GODZINY_LEKCYJNE)
         with col_l2:
-            przedmiot_wyb = st.selectbox("Przedmiot z planu:", ["Plastyka", "Matematyka"])
+            przedmiot_wyb = st.selectbox("Przedmiot z planu:", WSZYSTKIE_PRZEDMIOTY)
             
         temat_lekcji = st.text_input("Temat lekcji:", value="Wprowadzenie do nowego działu")
         
@@ -602,7 +646,6 @@ elif rola == "Nauczyciel":
     elif akt_zakl == "Oceny":
         st.markdown("### Dziennik Ocen — Zarządzanie ocenami z przedmiotu")
         
-        # Wybór przedmiotu i klasy przez nauczyciela
         col_op1, col_op2 = st.columns(2)
         with col_op1:
             wybrany_przedmiot = st.selectbox("Wybierz przedmiot:", WSZYSTKIE_PRZEDMIOTY)
@@ -737,10 +780,14 @@ elif rola == "Nauczyciel":
 
 # ================= PANEL UCZNIA =================
 elif rola == "Uczeń":
+    c.execute("SELECT klasa FROM uzytkownicy WHERE imie_nazwisko = ?", (user,))
+    res_ku = c.fetchone()
+    klasa_ucz = res_ku[0] if res_ku and res_ku[0] != "-" else "1c"
+
     if akt_zakl == "Oceny" or akt_zakl == "Interfejs":
         renderuj_tabelue_ocen_dla_ucznia(user)
     elif akt_zakl == "Plan":
-        renderuj_tabelue_planu_dla_klasy("1c")
+        renderuj_tabelue_planu_dla_klasy(klasa_ucz)
     elif akt_zakl == "Wiadomości":
         renderuj_zakladke_wiadomosci(user)
     elif akt_zakl == "Uwagi":
@@ -772,12 +819,16 @@ elif rola == "Rodzic":
     res_p = c.fetchone()
     dziecko = res_p[0] if res_p and res_p[0] != "-" else "Emilia Widomska"
     
+    c.execute("SELECT klasa FROM uzytkownicy WHERE imie_nazwisko = ?", (dziecko,))
+    res_kd = c.fetchone()
+    klasa_dziecka = res_kd[0] if res_kd and res_kd[0] != "-" else "1c"
+    
     st.subheader(f"Panel Rodzica — Podgląd dziecka: **{dziecko}**")
     
     if akt_zakl == "Oceny" or akt_zakl == "Interfejs":
         renderuj_tabelue_ocen_dla_ucznia(dziecko)
     elif akt_zakl == "Plan":
-        renderuj_tabelue_planu_dla_klasy("1c")
+        renderuj_tabelue_planu_dla_klasy(klasa_dziecka)
     elif akt_zakl == "Uwagi":
         st.subheader(f"Uwagi o uczniu: {dziecko}")
         df_uw = pd.read_sql("SELECT data as [Data], typ as [Typ], nauczyciel as [Nauczyciel], tresc as [Treść] FROM uwagi WHERE uczen = ?", conn, params=(dziecko,))
