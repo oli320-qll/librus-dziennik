@@ -108,11 +108,6 @@ if c.fetchone()[0] == 0:
     c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c", "Olivier"))
     conn.commit()
 
-c.execute("SELECT COUNT(*) FROM klasy")
-if c.fetchone()[0] == 0:
-    c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c", "Olivier"))
-    conn.commit()
-
 c.execute("SELECT COUNT(*) FROM plan_lekcji")
 if c.fetchone()[0] == 0:
     domyslny_plan = [
@@ -120,6 +115,11 @@ if c.fetchone()[0] == 0:
         ("1c", "Poniedziałek", "2 [08:00 - 08:45]", "Matematyka"),
     ]
     c.executemany("INSERT INTO plan_lekcji (klasa, dzien, nr_lekcji, przedmiot) VALUES (?, ?, ?, ?)", domyslny_plan)
+    conn.commit()
+
+c.execute("SELECT COUNT(*) FROM dyzury")
+if c.fetchone()[0] == 0:
+    c.execute("INSERT INTO dyzury (osoba, miejsce, dzien, godzina) VALUES (?, ?, ?, ?)", ("Olivier", "Parter - Wejście główne", "Poniedziałek", "Przerwa 09:40 - 09:50"))
     conn.commit()
 
 if "dziennik_user" not in st.session_state:
@@ -167,7 +167,6 @@ def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
     df_p = pd.read_sql("SELECT dzien, nr_lekcji, przedmiot FROM plan_lekcji WHERE klasa = ?", conn, params=(wybrana_klasa,))
     if not df_p.empty:
         pivot_plan = df_p.pivot_table(index="nr_lekcji", columns="dzien", values="przedmiot", aggfunc=lambda x: ', '.join(str(v) for v in x))
-        # Uporządkowanie kolumn według dni tygodnia jeśli istnieją
         dostepne_dni = [d for d in DNI_TYGODNIA if d in pivot_plan.columns]
         inne_dni = [d for d in pivot_plan.columns if d not in DNI_TYGODNIA]
         pivot_plan = pivot_plan[dostepne_dni + inne_dni]
@@ -303,7 +302,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 11:31</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 11:39</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -380,7 +379,7 @@ if akt_zakl == "Ustawienia":
 # ================= PANEL ADMINISTRATORA =================
 elif rola == "Admin":
     st.subheader("Panel Administratora")
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6 = st.tabs(["Zastępstwa", "Oceny Zachowania", "Użytkownicy", "Przypisania", "📅 Plan lekcji", "Wiadomości"])
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6, adm_tab7 = st.tabs(["Zastępstwa", "Oceny Zachowania", "Użytkownicy", "Przypisania", "📅 Plan lekcji", "🛡️ Dyżury", "Wiadomości"])
     
     with adm_tab1:
         st.subheader("Zarządzanie Zastępstwami")
@@ -590,6 +589,38 @@ elif rola == "Admin":
             st.info("Brak wpisów w planie lekcji.")
 
     with adm_tab6:
+        st.subheader("Zarządzanie Dyżurami Nauczycieli")
+        with st.form("form_dodaj_dyzur"):
+            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Nauczyciel'")
+            nauczyciele_l = [n[0] for n in c.fetchall()]
+            dyz_osoba = st.selectbox("Nauczyciel:", nauczyciele_l if nauczyciele_l else ["Olivier"])
+            dyz_miejsce = st.text_input("Miejsce dyżuru (np. Parter — Wejście główne):")
+            dyz_dzien = st.selectbox("Dzień:", DNI_TYGODNIA)
+            dyz_godzina = st.text_input("Godzina / Przerwa (np. Przerwa 09:40 - 09:50):")
+            
+            if st.form_submit_button("Dodaj dyżur", type="primary"):
+                c.execute("INSERT INTO dyzury (osoba, miejsce, dzien, godzina) VALUES (?, ?, ?, ?)",
+                          (dyz_osoba, dyz_miejsce, dyz_dzien, dyz_godzina))
+                conn.commit()
+                st.success("Dodano dyżur!")
+                st.rerun()
+
+        st.markdown("---")
+        st.write("### Aktualne dyżury")
+        df_dyz_all = pd.read_sql("SELECT id, osoba as [Nauczyciel], miejsce as [Miejsce], dzien as [Dzień], godzina as [Godzina] FROM dyzury", conn)
+        if not df_dyz_all.empty:
+            st.dataframe(df_dyz_all, use_container_width=True, hide_index=True)
+            with st.form("form_usun_dyzur"):
+                id_dyz_del = st.selectbox("Wybierz ID dyżuru do usunięcia:", df_dyz_all["id"].tolist())
+                if st.form_submit_button("Usuń dyżur", type="primary"):
+                    c.execute("DELETE FROM dyzury WHERE id = ?", (id_dyz_del,))
+                    conn.commit()
+                    st.success("Usunięto dyżur!")
+                    st.rerun()
+        else:
+            st.info("Brak zdefiniowanych dyżurów.")
+
+    with adm_tab7:
         renderuj_zakladke_wiadomosci("Administrator")
 
 # ================= PANEL NAUCZYCIELA =================
@@ -768,7 +799,16 @@ elif rola == "Nauczyciel":
         renderuj_zakladke_wiadomosci(user)
 
     elif akt_zakl == "Plan":
-        renderuj_tabelue_planu_dla_klasy("1c", allow_change=True)
+        nauczyciel_plan_tabs = st.tabs(["📅 Plan lekcji (Klasy)", "🛡️ Dyżury nauczycieli"])
+        with nauczyciel_plan_tabs[0]:
+            renderuj_tabelue_planu_dla_klasy("1c", allow_change=True)
+        with nauczyciel_plan_tabs[1]:
+            st.subheader("Harmonogram dyżurów nauczycielskich")
+            df_dyzury_n = pd.read_sql("SELECT osoba as [Nauczyciel], miejsce as [Miejsce], dzien as [Dzień], godzina as [Godzina] FROM dyzury", conn)
+            if not df_dyzury_n.empty:
+                st.dataframe(df_dyzury_n, use_container_width=True, hide_index=True)
+            else:
+                st.info("Brak zaplanowanych dyżurów.")
         
     elif akt_zakl == "Frekwencja":
         st.subheader("Zestawienie frekwencji")
