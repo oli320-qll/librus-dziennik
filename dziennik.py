@@ -71,7 +71,7 @@ st.markdown("""
 conn = sqlite3.connect("dziennik_szkolny.db", check_same_thread=False)
 c = conn.cursor()
 
-# Inicjalizacja tabel (tworzy tylko wtedy, gdy jeszcze ich nie ma — NIE nadpisuje istniejących danych)
+# Inicjalizacja tabel
 c.execute("CREATE TABLE IF NOT EXISTS uzytkownicy (id INTEGER PRIMARY KEY AUTOINCREMENT, imie_nazwisko TEXT, login TEXT, haslo TEXT, rola TEXT, klasa TEXT, powiazany_uczen TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS klasy (id INTEGER PRIMARY KEY AUTOINCREMENT, nazwa_klasy TEXT UNIQUE, wychowawca TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS przypisania (id INTEGER PRIMARY KEY AUTOINCREMENT, nauczyciel TEXT, przedmiot TEXT, klasa TEXT)")
@@ -85,7 +85,7 @@ c.execute("CREATE TABLE IF NOT EXISTS dyzury (id INTEGER PRIMARY KEY AUTOINCREME
 c.execute("CREATE TABLE IF NOT EXISTS oceny_zachowania (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, okres TEXT, ocena TEXT, opis TEXT)")
 conn.commit()
 
-# Bezpieczna migracja kolumn dla istniejących baz
+# Bezpieczna migracja kolumn
 migracje = [
     ("oceny", "kategoria", "TEXT"),
     ("oceny", "komentarz", "TEXT"),
@@ -99,7 +99,7 @@ for tabela, kolumna, typ in migracje:
     except sqlite3.OperationalError:
         pass
 
-# Dane startowe uruchamiane TYLKO w przypadku pustej bazy
+# Dane startowe uruchamiane tylko wtedy, gdy baza jest całkowicie pusta
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
 if c.fetchone()[0] == 0:
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Administrator", "admin", "admin123", "Admin", "-", "-"))
@@ -180,8 +180,20 @@ def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
         wybrana_klasa = docelowa_klasa
         st.markdown(f"#### Klasa ucznia: **{wybrana_klasa}**")
 
-    st.markdown(f"### Plan lekcji — Klasa: **{wybrana_klasa}**")
+    st.markdown(f"### Plan lekcji oraz Odwołania — Klasa: **{wybrana_klasa}**")
+    
+    # Pobieramy bazowy plan lekcji
     df_p = pd.read_sql("SELECT dzien, nr_lekcji, przedmiot FROM plan_lekcji WHERE klasa = ?", conn, params=(wybrana_klasa,))
+    
+    # Pobieramy informacje o zastępstwach / odwołaniach dla tej klasy
+    df_z = pd.read_sql("SELECT nr_lekcji, nowy_przedmiot, informacja FROM zastepstwa WHERE klasa = ?", conn, params=(wybrana_klasa,))
+    
+    # Jeśli są wpisy zastępstw/odwołań, nakładamy je na plan
+    if not df_p.empty and not df_z.empty:
+        zast_dict = {row.nr_lekcji: (row.nowy_przedmiot, row.informacja) for row in df_z.itertuples()}
+        # Podmieniamy przedmioty w planie jeśli występuje odwołanie/zastępstwo
+        df_p['przedmiot'] = df_p.apply(lambda r: f"🚫 {zast_dict[r['nr_lekcji']][0]} ({zast_dict[r['nr_lekcji']][1]})" if r['nr_lekcji'] in zast_dict else r['przedmiot'], axis=1)
+
     if not df_p.empty:
         pivot_plan = df_p.pivot_table(index="nr_lekcji", columns="dzien", values="przedmiot", aggfunc=lambda x: ', '.join(str(v) for v in x))
         dostepne_dni = [d for d in DNI_TYGODNIA if d in pivot_plan.columns]
@@ -324,7 +336,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 12:40</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 12:50</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -426,7 +438,7 @@ elif rola == "Admin":
                     z_nauczyciel = st.text_input("Zastępujący nauczyciel:")
                     z_info = st.text_input("Informacja / Komentarz:")
                     
-                if st.form_submit_button("Zapisz w systemiue", type="primary"):
+                if st.form_submit_button("Zapisz w systemie", type="primary"):
                     c.execute("INSERT INTO zastepstwa (data, klasa, nr_lekcji, stary_przedmiot, nowy_przedmiot, nauczyciel, informacja) VALUES (?, ?, ?, ?, ?, ?, ?)",
                               (str(z_data), z_klasa, z_nr, z_stary, z_nowy, z_nauczyciel, z_info))
                     conn.commit()
