@@ -358,7 +358,7 @@ def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
     else:
         st.info("Skrzynka odbiorcza jest pusta.")
 
-# ================= EKRAN LOGOWANIA LIBRUS =================
+# ================= EKRAN LOGOWANIA LIBRUS (STABILNY) =================
 if st.session_state["dziennik_user"] is None:
     st.markdown("""
         <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
@@ -370,14 +370,16 @@ if st.session_state["dziennik_user"] is None:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown('<div style="background: #f4f4f7; padding: 25px; border: 1px solid #cccccc; border-radius: 3px;">', unsafe_allow_html=True)
-        with st.form("form_logowania"):
+        
+        # Stabilny formularz logowania
+        with st.form("form_logowania_stabilne", clear_on_submit=False):
             st.subheader("Logowanie do systemu")
             login_in = st.text_input("Login:")
             haslo_in = st.text_input("Hasło:", type="password", help="Wpisz swoje hasło dostępowe")
             btn_log = st.form_submit_button("Zaloguj się", use_container_width=True)
             
             if btn_log:
-                c.execute("SELECT imie_nazwisko, rola, login FROM uzytkownicy WHERE login = ? AND haslo = ?", (login_in, haslo_in))
+                c.execute("SELECT imie_nazwisko, rola, login FROM uzytkownicy WHERE login = ? AND haslo = ?", (login_in.strip(), haslo_in))
                 res = c.fetchone()
                 if res:
                     if res[2] == "brak":
@@ -389,6 +391,7 @@ if st.session_state["dziennik_user"] is None:
                         st.rerun()
                 else:
                     st.error("Błędny login lub hasło.")
+                    
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("---")
