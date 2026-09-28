@@ -358,7 +358,7 @@ def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
     else:
         st.info("Skrzynka odbiorcza jest pusta.")
 
-# ================= EKRAN LOGOWANIA LIBRUS 1:1 =================
+# ================= EKRAN LOGOWANIA LIBRUS =================
 if st.session_state["dziennik_user"] is None:
     st.markdown("""
         <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
@@ -421,7 +421,7 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 100% responsywne menu mobilne (zamiast niedziałających małych przycisków)
+# 100% responsywne menu mobilne
 opcje_menu = ["📊 Oceny", "📋 Frekwencja", "✉️ Wiadomości", "📢 Ogłoszenia", "📖 Lekcja", "⚠️ Uwagi", "📅 Plan", "⚙️ Ustawienia", "🚪 Wyloguj"]
 wybrana_opcja_menu = st.selectbox("Wybierz moduł (Menu Synergia):", opcje_menu)
 
