@@ -13,16 +13,14 @@ if PRZERWA_TECHNICZNA:
 
 st.set_page_config(page_title="Synergia - Dziennik Elektroniczny", layout="wide")
 
-# Zaawansowany styl 1:1 imitujący interfejs Librus Synergia (klasyczne fiolety, szarości, obramowania tabel)
+# Zaawansowany styl 1:1 imitujący interfejs Librus Synergia
 st.markdown("""
     <style>
-    /* Ogólny styl tła i czcionek w stylu Librus */
     .stApp {
         background-color: #ffffff;
         font-family: Arial, Helvetica, sans-serif;
     }
     
-    /* Górny pasek menu Synergia */
     .librus-top-nav {
         background-color: #f1f1f3;
         border-bottom: 2px solid #dcdce0;
@@ -54,7 +52,6 @@ st.markdown("""
         letter-spacing: -1px;
     }
 
-    /* Tabeli ocen w stylu Librusa */
     .librus-table {
         width: 100%;
         border-collapse: collapse;
@@ -78,7 +75,6 @@ st.markdown("""
         background-color: #f9f9fb;
     }
 
-    /* Oceny - kolorowe kafelki */
     .grade-badge {
         display: inline-block;
         padding: 1px 6px;
@@ -98,7 +94,6 @@ st.markdown("""
     .g-0 { background-color: #757575; }
     .g-np { background-color: #607d8b; }
 
-    /* Przyciski w stylu Librusa */
     .stButton>button {
         background-color: #f0f0f4;
         border: 1px solid #adadb8;
@@ -258,7 +253,6 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
     
     st.markdown("### Oceny bieżące")
     
-    # Generowanie tabeli 1:1 identycznej z widokiem Synergii
     html_tabeli = """
     <table class="librus-table">
         <thead>
@@ -412,7 +406,7 @@ if st.session_state["dziennik_user"] is None:
 
     st.stop()
 
-# ================= GÓRNY PASEK NAWIGACYJNY LIBRUS (IDELANIE JAK NA ZDJĘCIU) =================
+# ================= GÓRNY PASEK NAWIGACYJNY LIBRUS =================
 st.markdown(f"""
     <div class="librus-top-nav">
         <div><b>Synergia</b> | Zalogowany jako: <b>{st.session_state['dziennik_user']}</b> ({st.session_state['dziennik_rola']})</div>
@@ -427,45 +421,30 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Pasek ikon menu przypominający górną belkę w Synergii
-cols_ikony = st.columns(9)
-with cols_ikony[0]:
-    if st.button("📊 Oceny", use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Oceny"
-        st.rerun()
-with cols_ikony[1]:
-    if st.button("📋 Frekwencja", use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Frekwencja"
-        st.rerun()
-with cols_ikony[2]:
-    if st.button("✉️ Wiadomości", use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Wiadomości"
-        st.rerun()
-with cols_ikony[3]:
-    if st.button("📢 Ogłoszenia", use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Ogłoszenia"
-        st.rerun()
-with cols_ikony[4]:
-    if st.button("📖 Lekcja", use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Realizacja"
-        st.rerun()
-with cols_ikony[5]:
-    if st.button("⚠️ Uwagi", use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Uwagi"
-        st.rerun()
-with cols_ikony[6]:
-    if st.button("📅 Plan", use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Plan"
-        st.rerun()
-with cols_ikony[7]:
-    if st.button("⚙️ Ustawienia", use_container_width=True):
-        st.session_state["librus_aktywna_zakladka"] = "Ustawienia"
-        st.rerun()
-with cols_ikony[8]:
-    if st.button("🚪 Wyloguj", use_container_width=True):
-        st.session_state["dziennik_user"] = None
-        st.session_state["dziennik_rola"] = None
-        st.rerun()
+# 100% responsywne menu mobilne (zamiast niedziałających małych przycisków)
+opcje_menu = ["📊 Oceny", "📋 Frekwencja", "✉️ Wiadomości", "📢 Ogłoszenia", "📖 Lekcja", "⚠️ Uwagi", "📅 Plan", "⚙️ Ustawienia", "🚪 Wyloguj"]
+wybrana_opcja_menu = st.selectbox("Wybierz moduł (Menu Synergia):", opcje_menu)
+
+if "Oceny" in wybrana_opcja_menu:
+    st.session_state["librus_aktywna_zakladka"] = "Oceny"
+elif "Frekwencja" in wybrana_opcja_menu:
+    st.session_state["librus_aktywna_zakladka"] = "Frekwencja"
+elif "Wiadomości" in wybrana_opcja_menu:
+    st.session_state["librus_aktywna_zakladka"] = "Wiadomości"
+elif "Ogłoszenia" in wybrana_opcja_menu:
+    st.session_state["librus_aktywna_zakladka"] = "Ogłoszenia"
+elif "Lekcja" in wybrana_opcja_menu:
+    st.session_state["librus_aktywna_zakladka"] = "Realizacja"
+elif "Uwagi" in wybrana_opcja_menu:
+    st.session_state["librus_aktywna_zakladka"] = "Uwagi"
+elif "Plan" in wybrana_opcja_menu:
+    st.session_state["librus_aktywna_zakladka"] = "Plan"
+elif "Ustawienia" in wybrana_opcja_menu:
+    st.session_state["librus_aktywna_zakladka"] = "Ustawienia"
+elif "Wyloguj" in wybrana_opcja_menu:
+    st.session_state["dziennik_user"] = None
+    st.session_state["dziennik_rola"] = None
+    st.rerun()
 
 st.divider()
 
@@ -698,7 +677,6 @@ elif rola == "Admin":
 elif rola == "Nauczyciel":
     if akt_zakl == "Realizacja" or akt_zakl == "Oceny" or akt_zakl == "Uwagi" or akt_zakl == "Wiadomości" or akt_zakl == "Plan" or akt_zakl == "Frekwencja":
         
-        # Pasek podrzędny nauczyciela odpowiadający tradycyjnym zakładkom w Librusie
         nauczyciel_glowne_menu = st.radio("Widok nauczyciela:", ["Dziennik lekcyjny (Tematy i Frekwencja)", "Oceny bieżące", "Uwagi", "Wiadomości", "Plan i Dyżury", "Frekwencja zestawienie"], horizontal=True)
         
         st.divider()
