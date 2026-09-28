@@ -345,7 +345,7 @@ def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
     else:
         st.info("Skrzynka odbiorcza jest pusta.")
 
-# ================= EKRAN LOGOWANIA LIBRUS (POPRAWIONy) =================
+# ================= EKRAN LOGOWANIA LIBRUS (BEZ INSTRUKCJI) =================
 if st.session_state["dziennik_user"] is None:
     st.markdown("""
         <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
@@ -353,15 +353,6 @@ if st.session_state["dziennik_user"] is None:
             <div style="font-size: 14px; color: #555555;">System Obsługi Szkoły i Placówki Oświatowej</div>
         </div>
     """, unsafe_allow_html=True)
-
-    # Informacja pomocnicza dla Ciebie z danymi logowania
-    with st.expander("ℹ️ Dane do testowania (kliknij, aby rozwinąć)"):
-        st.markdown("""
-        * **Admin:** login: `admin` | hasło: `admin123`
-        * **Nauczyciel (Olivier):** login: `olivier` | hasło: `admin123`
-        * **Uczeń (Emilia):** login: `emilia` | hasło: `emilia123`
-        * **Rodzic (Jan Widomski):** login: `rodzic` | hasło: `rodzic123`
-        """)
 
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
@@ -374,7 +365,6 @@ if st.session_state["dziennik_user"] is None:
             btn_log = st.form_submit_button("Zaloguj się", use_container_width=True)
             
             if btn_log:
-                # Dokładne dopasowanie uwzględniające małe/wielkie litery
                 c.execute("SELECT imie_nazwisko, rola, login FROM uzytkownicy WHERE LOWER(login) = LOWER(?) AND haslo = ?", (login_in.strip(), haslo_in))
                 res = c.fetchone()
                 if res:
