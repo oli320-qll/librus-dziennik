@@ -150,18 +150,14 @@ if c.fetchone()[0] == 0:
     
     uczniowie_1c_start = [
         ("Emilia Widomska", "emilia", "emilia123"),
-        ("Adam Nowak", "brak", "brak"),
-        ("Barbara Kozakowska", "brak", "brak"),
-        ("Katarzyna Nowakówna", "brak", "brak"),
-        ("Łucja Widomska", "brak", "brak"),
-        ("Adam Kazimierz", "brak", "brak"),
-        ("Kacper Opolski", "brak", "brak")
+        ("Adam Nowak", "adam", "adam123"),
+        ("Barbara Kozakowska", "barbara", "barbara123")
     ]
     for u_imie, u_log, u_has in uczniowie_1c_start:
         c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", 
                   (u_imie, u_log, u_has, "Uczeń", "1c", "-"))
                   
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Jan Widomski", "rodzic_emilia", "rodzic123", "Rodzic", "1c", "Emilia Widomska"))
+    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Jan Widomski", "rodzic", "rodzic123", "Rodzic", "1c", "Emilia Widomska"))
     c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c", "Olivier"))
     conn.commit()
 
@@ -177,11 +173,6 @@ if c.fetchone()[0] == 0:
         ("1c", "Poniedziałek", "2 [08:00 - 08:45]", "Matematyka"),
     ]
     c.executemany("INSERT INTO plan_lekcji (klasa, dzien, nr_lekcji, przedmiot) VALUES (?, ?, ?, ?)", domyslny_plan)
-    conn.commit()
-
-c.execute("SELECT COUNT(*) FROM dyzury")
-if c.fetchone()[0] == 0:
-    c.execute("INSERT INTO dyzury (osoba, miejsce, dzien, godzina) VALUES (?, ?, ?, ?)", ("Olivier", "Parter - Wejście główne", "Poniedziałek", "Przerwa 09:40 - 09:50"))
     conn.commit()
 
 if "dziennik_user" not in st.session_state:
@@ -247,11 +238,7 @@ def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
         st.info(f"Brak zdefiniowanego planu lekcji dla klasy {wybrana_klasa}.")
 
 def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
-    c.execute("SELECT klasa FROM uzytkownicy WHERE imie_nazwisko = ?", (imie_ucznia,))
-    res_k = c.fetchone()
-    klasa_ucznia = res_k[0] if res_k and res_k[0] != "-" else "1c"
-    
-    st.markdown("### Oceny bieżące")
+    st.markdown(f"### Oceny bieżące ucznia: {imie_ucznia}")
     
     html_tabeli = """
     <table class="librus-table">
@@ -358,7 +345,7 @@ def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
     else:
         st.info("Skrzynka odbiorcza jest pusta.")
 
-# ================= EKRAN LOGOWANIA LIBRUS (STABILNY) =================
+# ================= EKRAN LOGOWANIA LIBRUS (POPRAWIONy) =================
 if st.session_state["dziennik_user"] is None:
     st.markdown("""
         <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
@@ -367,45 +354,38 @@ if st.session_state["dziennik_user"] is None:
         </div>
     """, unsafe_allow_html=True)
 
+    # Informacja pomocnicza dla Ciebie z danymi logowania
+    with st.expander("ℹ️ Dane do testowania (kliknij, aby rozwinąć)"):
+        st.markdown("""
+        * **Admin:** login: `admin` | hasło: `admin123`
+        * **Nauczyciel (Olivier):** login: `olivier` | hasło: `admin123`
+        * **Uczeń (Emilia):** login: `emilia` | hasło: `emilia123`
+        * **Rodzic (Jan Widomski):** login: `rodzic` | hasło: `rodzic123`
+        """)
+
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown('<div style="background: #f4f4f7; padding: 25px; border: 1px solid #cccccc; border-radius: 3px;">', unsafe_allow_html=True)
         
-        # Stabilny formularz logowania
-        with st.form("form_logowania_stabilne", clear_on_submit=False):
+        with st.form("form_logowania_fix"):
             st.subheader("Logowanie do systemu")
             login_in = st.text_input("Login:")
-            haslo_in = st.text_input("Hasło:", type="password", help="Wpisz swoje hasło dostępowe")
+            haslo_in = st.text_input("Hasło:", type="password")
             btn_log = st.form_submit_button("Zaloguj się", use_container_width=True)
             
             if btn_log:
-                c.execute("SELECT imie_nazwisko, rola, login FROM uzytkownicy WHERE login = ? AND haslo = ?", (login_in.strip(), haslo_in))
+                # Dokładne dopasowanie uwzględniające małe/wielkie litery
+                c.execute("SELECT imie_nazwisko, rola, login FROM uzytkownicy WHERE LOWER(login) = LOWER(?) AND haslo = ?", (login_in.strip(), haslo_in))
                 res = c.fetchone()
                 if res:
-                    if res[2] == "brak":
-                        st.error("Konto nie jest aktywowane.")
-                    else:
-                        st.session_state["dziennik_user"] = res[0]
-                        st.session_state["dziennik_rola"] = res[1]
-                        st.success("Zalogowano pomyślnie!")
-                        st.rerun()
+                    st.session_state["dziennik_user"] = res[0]
+                    st.session_state["dziennik_rola"] = res[1]
+                    st.success("Zalogowano pomyślnie!")
+                    st.rerun()
                 else:
                     st.error("Błędny login lub hasło.")
                     
         st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.subheader("Ogłoszenia")
-        df_ogloszenia_pub = pd.read_sql("SELECT data as [Data], tytul as [Tytuł], tresc as [Treść] FROM ogloszenia ORDER BY id DESC", conn)
-        if not df_ogloszenia_pub.empty:
-            for idx, row in df_ogloszenia_pub.iterrows():
-                st.markdown(f"""
-                    <div style="background-color: #f9f9fb; padding: 8px; border: 1px solid #dcdce0; border-radius: 2px; margin-bottom: 6px; font-size: 12px;">
-                        <b>{row['Data']} — {row['Tytuł']}</b><br>{row['Treść']}
-                    </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("Brak ogłoszeń.")
 
     st.stop()
 
@@ -424,7 +404,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 100% responsywne menu mobilne
 opcje_menu = ["📊 Oceny", "📋 Frekwencja", "✉️ Wiadomości", "📢 Ogłoszenia", "📖 Lekcja", "⚠️ Uwagi", "📅 Plan", "⚙️ Ustawienia", "🚪 Wyloguj"]
 wybrana_opcja_menu = st.selectbox("Wybierz moduł (Menu Synergia):", opcje_menu)
 
@@ -580,11 +559,11 @@ elif rola == "Admin":
         with sub_adm_t1:
             with st.form("form_dodaj_uzytkownika"):
                 d_imie = st.text_input("Imię i nazwisko:")
-                d_login = st.text_input("Login:", value="brak")
-                d_haslo = st.text_input("Hasło:", value="brak", type="password")
+                d_login = st.text_input("Login:")
+                d_haslo = st.text_input("Hasło:", type="password")
                 d_rola = st.selectbox("Rola:", ["Admin", "Nauczyciel", "Uczeń", "Rodzic"])
                 d_klasa = st.text_input("Klasa:", value="1c")
-                d_powiazany = st.selectbox("Powiązany uczeń:", ["-"] + uczniowie_baza)
+                d_powiazany = st.selectbox("Powiązany uczeń (dla rodzica):", ["-"] + uczniowie_baza)
                 if st.form_submit_button("Dodaj", type="primary"):
                     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)",
                               (d_imie, d_login, d_haslo, d_rola, d_klasa, d_powiazany))
@@ -608,9 +587,10 @@ elif rola == "Admin":
                     role_lista = ["Admin", "Nauczyciel", "Uczeń", "Rodzic"]
                     ed_rola = st.selectbox("Rola:", role_lista, index=role_lista.index(dane_u[3]) if dane_u[3] in role_lista else 0)
                     ed_klasa = st.text_input("Klasa:", value=dane_u[4])
+                    ed_powiazany = st.text_input("Powiązany uczeń:", value=dane_u[5] if dane_u[5] else "-")
                     if st.form_submit_button("Zapisz", type="primary"):
-                        c.execute("UPDATE uzytkownicy SET imie_nazwisko = ?, login = ?, haslo = ?, rola = ?, klasa = ? WHERE id = ?",
-                                  (ed_imie, ed_login, ed_haslo, ed_rola, ed_klasa, ed_id))
+                        c.execute("UPDATE uzytkownicy SET imie_nazwisko = ?, login = ?, haslo = ?, rola = ?, klasa = ?, powiazany_uczen = ? WHERE id = ?",
+                                  (ed_imie, ed_login, ed_haslo, ed_rola, ed_klasa, ed_powiazany, ed_id))
                         conn.commit()
                         st.success("Zaktualizowano!")
                         st.rerun()
@@ -840,4 +820,19 @@ elif rola == "Rodzic":
         renderuj_zakladke_wiadomosci(user)
     elif akt_zakl == "Frekwencja":
         df_f_d = pd.read_sql("SELECT data as [Data], status as [Status] FROM frekwencja WHERE uczen = ?", conn, params=(dziecko,))
-        st.dataframe(df_f_d, use_container_width=True, hide_index=True)
+        if not df_f_d.empty:
+            st.dataframe(df_f_d, use_container_width=True, hide_index=True)
+        else:
+            st.info("Brak wpisów frekwencji dla dziecka.")
+    elif akt_zakl == "Plan":
+        c.execute("SELECT klasa FROM uzytkownicy WHERE imie_nazwisko = ?", (dziecko,))
+        r_kl = c.fetchone()
+        kl_dziecka = r_kl[0] if r_kl and r_kl[0] != "-" else "1c"
+        renderuj_tabelue_planu_dla_klasy(kl_dziecka)
+    elif akt_zakl == "Uwagi":
+        st.subheader(f"Uwagi dotyczące dziecka: {dziecko}")
+        df_uw_d = pd.read_sql("SELECT data as [Data], typ as [Typ], tresc as [Treść] FROM uwagi WHERE uczen = ?", conn, params=(dziecko,))
+        if not df_uw_d.empty:
+            st.dataframe(df_uw_d, use_container_width=True, hide_index=True)
+        else:
+            st.info("Brak uwag.")
