@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import date
 
 # ================= TRYB PRZERWY TECHNICZNEJ =================
-PRZERWA_TECHNICZNA = False
+PRZERWA_TECHNICZNA = True
 
 if PRZERWA_TECHNICZNA:
     st.warning("⚠️ **Przerwa techniczna!** System Librus jest obecnie niedostępny z powodu prac konserwacyjnych. Zapraszamy w godzinach od 12:00 do 13:00.")
