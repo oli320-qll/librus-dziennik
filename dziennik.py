@@ -7,7 +7,7 @@ from datetime import date
 PRZERWA_TECHNICZNA = True
 
 if PRZERWA_TECHNICZNA:
-    st.warning("⚠️ **Przerwa techniczna!** System Librus jest obecnie niedostępny z powodu prac konserwacyjnych. Zapraszamy w godzinach od 12:00 do 13:00.")
+    st.warning("⚠️ **Przerwa techniczna!** System Librus jest obecnie niedostępny z powodu prac konserwacyjnych. Zapraszamy w godzinach od 16:00 do 17:00.")
     st.stop()
 # =============================================================
 
