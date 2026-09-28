@@ -7,81 +7,31 @@ from datetime import date
 PRZERWA_TECHNICZNA = False
 
 if PRZERWA_TECHNICZNA:
-    st.warning("⚠️ **Przerwa techniczna!** System Synergia jest obecnie niedostępny z powodu prac konserwacyjnych.")
+    st.warning("⚠️ **Przerwa techniczna!** System jest obecnie niedostępny z powodu prac konserwacyjnych.")
     st.stop()
 # =============================================================
 
-st.set_page_config(page_title="Synergia - Dziennik Elektroniczny", layout="wide")
+st.set_page_config(page_title="Dziennik Szkolny", layout="wide")
 
-# Zaawansowany styl 1:1 imitujący interfejs Librus Synergia
+# Schludny styl nawiązujący do przesłanych zrzutów ekranu (paski zielone/niebieskie)
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #ffffff;
-        font-family: Arial, Helvetica, sans-serif;
-    }
-    
-    .librus-top-nav {
-        background-color: #f1f1f3;
-        border-bottom: 2px solid #dcdce0;
-        padding: 5px 10px;
-        font-size: 11px;
-        color: #333333;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 5px;
-    }
-    
-    .librus-header-bar {
-        background: linear-gradient(to bottom, #fcfcfc 0%, #e6e6ec 100%);
-        border: 1px solid #cccccc;
+    .school-header-bar {
+        background-color: #2e7d32;
         padding: 8px 15px;
-        border-radius: 2px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        border-radius: 3px;
         margin-bottom: 15px;
-    }
-    
-    .librus-logo {
-        font-size: 26px;
+        color: white;
         font-weight: bold;
-        color: #6b2d5c;
-        font-family: Arial, sans-serif;
-        letter-spacing: -1px;
-    }
-
-    .librus-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
         font-family: Arial, sans-serif;
     }
-    .librus-table th {
-        background-color: #e2e2e8;
-        color: #333333;
-        border: 1px solid #b5b5c0;
-        padding: 6px;
-        text-align: center;
-        font-weight: bold;
-    }
-    .librus-table td {
-        border: 1px solid #cccccc;
-        padding: 5px 8px;
-        background-color: #ffffff;
-    }
-    .librus-table tr:nth-child(even) td {
-        background-color: #f9f9fb;
-    }
-
     .grade-badge {
         display: inline-block;
-        padding: 1px 6px;
-        margin: 1px;
-        border-radius: 2px;
+        padding: 2px 8px;
+        margin: 2px;
+        border-radius: 3px;
         font-weight: bold;
-        font-size: 11px;
+        font-size: 12px;
         color: white;
         text-align: center;
     }
@@ -95,16 +45,10 @@ st.markdown("""
     .g-np { background-color: #607d8b; }
 
     .stButton>button {
-        background-color: #f0f0f4;
-        border: 1px solid #adadb8;
-        border-radius: 2px;
+        border-radius: 3px;
         font-size: 11px;
-        color: #222222;
-        padding: 4px 8px;
-    }
-    .stButton>button:hover {
-        background-color: #e4e4ec;
-        border-color: #6b2d5c;
+        padding: 4px 6px;
+        width: 100%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -112,7 +56,7 @@ st.markdown("""
 conn = sqlite3.connect("dziennik_szkolny.db", check_same_thread=False)
 c = conn.cursor()
 
-# Inicjalizacja tabel w bazie danych
+# Inicjalizacja tabel
 c.execute("CREATE TABLE IF NOT EXISTS uzytkownicy (id INTEGER PRIMARY KEY AUTOINCREMENT, imie_nazwisko TEXT, login TEXT, haslo TEXT, rola TEXT, klasa TEXT, powiazany_uczen TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS klasy (id INTEGER PRIMARY KEY AUTOINCREMENT, nazwa_klasy TEXT UNIQUE, wychowawca TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS przypisania (id INTEGER PRIMARY KEY AUTOINCREMENT, nauczyciel TEXT, przedmiot TEXT, klasa TEXT)")
@@ -142,7 +86,7 @@ for tabela, kolumna, typ in migracje:
     except sqlite3.OperationalError:
         pass
 
-# Dane startowe dla nowej bazy
+# Dane startowe uruchamiane tylko w nowej bazie
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
 if c.fetchone()[0] == 0:
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Administrator", "admin", "admin123", "Admin", "-", "-"))
@@ -167,7 +111,7 @@ if c.fetchone()[0] == 0:
 
 c.execute("SELECT COUNT(*) FROM ogloszenia")
 if c.fetchone()[0] == 0:
-    c.execute("INSERT INTO ogloszenia (tytul, tresc, data) VALUES (?, ?, ?)", ("Witamy w nowym semestrze!", "Zapraszamy do korzystania z dziennika elektronicznego Synergia.", str(date.today())))
+    c.execute("INSERT INTO ogloszenia (tytul, tresc, data) VALUES (?, ?, ?)", ("Witamy w nowym semestrze!", "Zapraszamy do korzystania z dziennika elektronicznego.", str(date.today())))
     conn.commit()
 
 c.execute("SELECT COUNT(*) FROM plan_lekcji")
@@ -189,7 +133,7 @@ if "dziennik_user" not in st.session_state:
 if "dziennik_rola" not in st.session_state:
     st.session_state["dziennik_rola"] = None
 if "librus_aktywna_zakladka" not in st.session_state:
-    st.session_state["librus_aktywna_zakladka"] = "Oceny"
+    st.session_state["librus_aktywna_zakladka"] = "Ogłoszenia"
 
 if "lekcja_temat" not in st.session_state:
     st.session_state["lekcja_temat"] = "Wprowadzenie do nowego działu"
@@ -223,12 +167,12 @@ def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
         docelowa_klasa = klasy_baza[0]
         
     if allow_change:
-        wybrana_klasa = st.selectbox("Wybierz klasę:", klasy_baza, index=klasy_baza.index(docelowa_klasa), key=f"sel_plan_{docelowa_klasa}")
+        wybrana_klasa = st.selectbox("Wybierz klasę do wyświetlenia planu:", klasy_baza, index=klasy_baza.index(docelowa_klasa), key=f"sel_plan_{docelowa_klasa}")
     else:
         wybrana_klasa = docelowa_klasa
-        st.markdown(f"**Klasa:** {wybrana_klasa}")
+        st.markdown(f"#### Klasa: **{wybrana_klasa}**")
 
-    st.markdown(f"### Plan lekcji i Zastępstwa — Klasa: {wybrana_klasa}")
+    st.markdown(f"### Plan lekcji oraz Zastępstwa — Klasa: **{wybrana_klasa}**")
     
     df_p = pd.read_sql("SELECT dzien, nr_lekcji, przedmiot FROM plan_lekcji WHERE klasa = ?", conn, params=(wybrana_klasa,))
     df_z = pd.read_sql("SELECT nr_lekcji, nowy_przedmiot, informacja FROM zastepstwa WHERE klasa = ?", conn, params=(wybrana_klasa,))
@@ -251,29 +195,14 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
     res_k = c.fetchone()
     klasa_ucznia = res_k[0] if res_k and res_k[0] != "-" else "1c"
     
-    st.markdown("### Oceny bieżące")
-    
-    html_tabeli = """
-    <table class="librus-table">
-        <thead>
-            <tr>
-                <th rowspan="2" style="width: 25%;">Przedmiot</th>
-                <th colspan="3">Okres 1</th>
-                <th colspan="3">Okres 2</th>
-            </tr>
-            <tr>
-                <th>Oceny bieżące</th>
-                <th style="width: 8%;">Śr. 1</th>
-                <th style="width: 6%;">R</th>
-                <th>Oceny bieżące</th>
-                <th style="width: 8%;">Śr. 2</th>
-                <th style="width: 6%;">R</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    for przedm in WSZYSTKIE_PRZEDMIOTY:
+    c.execute("SELECT DISTINCT przedmiot FROM plan_lekcji WHERE klasa = ?", (klasa_ucznia,))
+    przedmioty_klasy = [row[0] for row in c.fetchall()]
+    if not przedmioty_klasy:
+        przedmioty_klasy = ["Plastyka", "Matematyka"]
+
+    st.markdown(f"### Oceny bieżące i szczegóły (Klasa: {klasa_ucznia})")
+    tabela_dane = []
+    for przedm in przedmioty_klasy:
         df_oceny_p = pd.read_sql("SELECT ocena, waga FROM oceny WHERE uczen = ? AND przedmiot = ?", conn, params=(imie_ucznia, przedm))
         okres_1_html = ""
         srednia_p = "-"
@@ -284,8 +213,10 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
             for row in df_oceny_p.itertuples():
                 val_str = str(row.ocena)
                 waga = int(row.waga)
+                
                 css_klasa = f"g-{val_str}" if val_str in ["0", "1", "2", "3", "4", "5", "6"] else "g-np"
                 badge_list.append(f'<span class="grade-badge {css_klasa}">{val_str}</span>')
+                
                 if val_str.isdigit():
                     val = int(val_str)
                     if val > 0:
@@ -295,25 +226,18 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
             if suma_wag > 0:
                 srednia_p = round(suma_wazona / suma_wag, 2)
         else:
-            okres_1_html = '<span style="color: #999; font-style: italic;">Brak ocen</span>'
+            okres_1_html = '<span style="color: gray; font-size: 12px;">Brak ocen</span>'
             
-        html_tabeli += f"""
-            <tr>
-                <td><b>{przedm}</b></td>
-                <td>{okres_1_html}</td>
-                <td style="text-align: center;"><b>{srednia_p}</b></td>
-                <td style="text-align: center;">-</td>
-                <td style="color: #999; font-style: italic;">Brak ocen</td>
-                <td style="text-align: center;">-</td>
-                <td style="text-align: center;">-</td>
-            </tr>
-        """
-        
-    html_tabeli += "</tbody></table>"
-    st.markdown(html_tabeli, unsafe_allow_html=True)
+        tabela_dane.append({
+            "Przedmiot": przedm,
+            "Oceny bieżące": okres_1_html,
+            "Średnia": srednia_p
+        })
+    df_librus = pd.DataFrame(tabela_dane)
+    st.write(df_librus.to_html(escape=False, index=False), unsafe_allow_html=True)
     
     st.markdown("---")
-    st.subheader("Szczegóły i historia ocen")
+    st.subheader("Szczegóły ocen")
     df_szczegoly = pd.read_sql("SELECT data as [Data], przedmiot as [Przedmiot], ocena as [Ocena], kategoria as [Kategoria], waga as [Waga], komentarz as [Komentarz] FROM oceny WHERE uczen = ?", conn, params=(imie_ucznia,))
     if not df_szczegoly.empty:
         st.dataframe(df_szczegoly, use_container_width=True, hide_index=True)
@@ -321,84 +245,88 @@ def renderuj_tabelue_ocen_dla_ucznia(imie_ucznia):
         st.info("Brak szczegółów ocen.")
 
 def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
-    st.subheader("Wiadomości")
+    st.subheader("Skrzynka wiadomości")
     c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE imie_nazwisko != ?", (aktualny_uzytkownik,))
     osoby = [o[0] for o in c.fetchall()]
     
     with st.form("form_wyslij_wiadomosc"):
         st.write("### Nowa wiadomość")
-        odb = st.selectbox("Adresat:", osoby if osoby else ["Brak"])
+        odb = st.selectbox("Do:", osoby if osoby else ["Brak"])
         temat = st.text_input("Temat:")
         tresc = st.text_area("Treść:")
-        if st.form_submit_button("Wyślij", type="primary"):
+        if st.form_submit_button("Wyślij wiadomość", type="primary"):
             if odb and odb != "Brak":
                 c.execute("INSERT INTO wiadomosci (nadawca, odbiorca, temat, tresc, data) VALUES (?, ?, ?, ?, ?)",
                           (aktualny_uzytkownik, odb, temat, tresc, str(date.today())))
                 conn.commit()
-                st.success("Wiadomość została wysłana.")
+                st.success("Wiadomość została wysłana!")
                 st.rerun()
 
     st.markdown("---")
-    st.subheader("Odebrane")
+    st.subheader("Otrzymane wiadomości")
     df_msg = pd.read_sql("SELECT id, nadawca as [Od], temat as [Temat], tresc as [Treść], data as [Data] FROM wiadomosci WHERE odbiorca = ? ORDER BY id DESC", conn, params=(aktualny_uzytkownik,))
     
     if not df_msg.empty:
         for idx, row in df_msg.iterrows():
-            st.markdown(f"""
-                <div style="background-color: #f9f9fb; padding: 10px; border: 1px solid #dcdce0; border-radius: 2px; margin-bottom: 8px; font-size: 12px;">
-                    <b>Od: {row['Od']}</b> | <i>Data: {row['Data']}</i><br>
-                    <b>Temat: {row['Temat']}</b><br>
-                    <p style="margin-top: 4px;">{row['Treść']}</p>
-                </div>
-            """, unsafe_allow_html=True)
-            if st.button("Usuń wiadomość", key=f"del_msg_{row['id']}"):
-                c.execute("DELETE FROM wiadomosci WHERE id = ?", (row['id'],))
-                conn.commit()
-                st.rerun()
+            with st.container():
+                st.markdown(f"""
+                    <div style="background-color: #f8f9fa; padding: 10px; border-left: 4px solid #2e7d32; border-radius: 3px; margin-bottom: 10px;">
+                        <b>Od: {row['Od']}</b> | <i>Data: {row['Data']}</i><br>
+                        <b>Temat: {row['Temat']}</b><br>
+                        <p style="margin-top: 5px;">{row['Treść']}</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                col_btn_del, _ = st.columns([1, 4])
+                with col_btn_del:
+                    if st.button("🗑️ Usuń", key=f"del_msg_{row['id']}"):
+                        c.execute("DELETE FROM wiadomosci WHERE id = ?", (row['id'],))
+                        conn.commit()
+                        st.success("Wiadomość została usunięta!")
+                        st.rerun()
     else:
-        st.info("Skrzynka odbiorcza jest pusta.")
+        st.info("Brak wiadomości w skrzynce odbiorczej.")
 
-# ================= EKRAN LOGOWANIA LIBRUS 1:1 =================
+# ================= EKRAN LOGOWANIA =================
 if st.session_state["dziennik_user"] is None:
     st.markdown("""
-        <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
-            <div style="font-size: 42px; font-weight: bold; color: #6b2d5c; font-family: Arial;">Synergia</div>
-            <div style="font-size: 14px; color: #555555;">System Obsługi Szkoły i Placówki Oświatowej</div>
+        <div style="text-align: center; padding: 20px 10px 10px 10px;">
+            <h1 style="color: #2e7d32; font-size: 32px;"><b>Dziennik Szkolny</b></h1>
+            <p style="color: gray; font-size: 13px;">Elektroniczny system obsługi szkoły</p>
         </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
-        st.markdown('<div style="background: #f4f4f7; padding: 25px; border: 1px solid #cccccc; border-radius: 3px;">', unsafe_allow_html=True)
         with st.form("form_logowania"):
-            st.subheader("Logowanie do systemu")
+            st.subheader("Logowanie")
             login_in = st.text_input("Login:")
-            haslo_in = st.text_input("Hasło:", type="password", help="Wpisz swoje hasło dostępowe")
-            btn_log = st.form_submit_button("Zaloguj się", use_container_width=True)
+            haslo_in = st.text_input("Hasło:", type="password")
+            btn_log = st.form_submit_button("Zaloguj się", type="primary", use_container_width=True)
             
             if btn_log:
                 c.execute("SELECT imie_nazwisko, rola, login FROM uzytkownicy WHERE login = ? AND haslo = ?", (login_in, haslo_in))
                 res = c.fetchone()
                 if res:
                     if res[2] == "brak":
-                        st.error("Konto nie jest aktywowane.")
+                        st.error("To konto nie ma jeszcze aktywnego loginu.")
                     else:
                         st.session_state["dziennik_user"] = res[0]
                         st.session_state["dziennik_rola"] = res[1]
                         st.success("Zalogowano pomyślnie!")
                         st.rerun()
                 else:
-                    st.error("Błędny login lub hasło.")
-        st.markdown('</div>', unsafe_allow_html=True)
+                    st.error("Błędny login lub hasło!")
 
         st.markdown("---")
-        st.subheader("Ogłoszenia")
+        st.subheader("📢 Ogłoszenia szkolne")
         df_ogloszenia_pub = pd.read_sql("SELECT data as [Data], tytul as [Tytuł], tresc as [Treść] FROM ogloszenia ORDER BY id DESC", conn)
         if not df_ogloszenia_pub.empty:
             for idx, row in df_ogloszenia_pub.iterrows():
                 st.markdown(f"""
-                    <div style="background-color: #f9f9fb; padding: 8px; border: 1px solid #dcdce0; border-radius: 2px; margin-bottom: 6px; font-size: 12px;">
-                        <b>{row['Data']} — {row['Tytuł']}</b><br>{row['Treść']}
+                    <div style="background-color: #f8f9fa; padding: 10px; border-left: 4px solid #2e7d32; border-radius: 3px; margin-bottom: 8px; font-size: 13px;">
+                        <b>📅 {row['Data']} — {row['Tytuł']}</b><br>
+                        <p style="margin-top: 4px; margin-bottom: 0px;">{row['Treść']}</p>
                     </div>
                 """, unsafe_allow_html=True)
         else:
@@ -406,45 +334,51 @@ if st.session_state["dziennik_user"] is None:
 
     st.stop()
 
-# ================= GÓRNY PASEK NAWIGACYJNY LIBRUS =================
+# ================= SCHLUDNY PASEK NAWIGACYJNY (STYLO-LIBRUS) =================
 st.markdown(f"""
-    <div class="librus-top-nav">
-        <div><b>Synergia</b> | Zalogowany jako: <b>{st.session_state['dziennik_user']}</b> ({st.session_state['dziennik_rola']})</div>
-        <div>Portal Librus Synergia</div>
+    <div class="school-header-bar">
+        Zalogowany: <b>{st.session_state['dziennik_user']}</b> ({st.session_state['dziennik_rola']})
     </div>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-    <div class="librus-header-bar">
-        <div class="librus-logo">Synergia</div>
-        <div style="font-size: 11px; color: #444;">Rok szkolny 2025/2026</div>
-    </div>
-""", unsafe_allow_html=True)
-
-# 100% responsywne menu mobilne (zamiast niedziałających małych przycisków)
-opcje_menu = ["📊 Oceny", "📋 Frekwencja", "✉️ Wiadomości", "📢 Ogłoszenia", "📖 Lekcja", "⚠️ Uwagi", "📅 Plan", "⚙️ Ustawienia", "🚪 Wyloguj"]
-wybrana_opcja_menu = st.selectbox("Wybierz moduł (Menu Synergia):", opcje_menu)
-
-if "Oceny" in wybrana_opcja_menu:
-    st.session_state["librus_aktywna_zakladka"] = "Oceny"
-elif "Frekwencja" in wybrana_opcja_menu:
-    st.session_state["librus_aktywna_zakladka"] = "Frekwencja"
-elif "Wiadomości" in wybrana_opcja_menu:
-    st.session_state["librus_aktywna_zakladka"] = "Wiadomości"
-elif "Ogłoszenia" in wybrana_opcja_menu:
-    st.session_state["librus_aktywna_zakladka"] = "Ogłoszenia"
-elif "Lekcja" in wybrana_opcja_menu:
-    st.session_state["librus_aktywna_zakladka"] = "Realizacja"
-elif "Uwagi" in wybrana_opcja_menu:
-    st.session_state["librus_aktywna_zakladka"] = "Uwagi"
-elif "Plan" in wybrana_opcja_menu:
-    st.session_state["librus_aktywna_zakladka"] = "Plan"
-elif "Ustawienia" in wybrana_opcja_menu:
-    st.session_state["librus_aktywna_zakladka"] = "Ustawienia"
-elif "Wyloguj" in wybrana_opcja_menu:
-    st.session_state["dziennik_user"] = None
-    st.session_state["dziennik_rola"] = None
-    st.rerun()
+cols_ikony = st.columns(9)
+with cols_ikony[0]:
+    if st.button("📢 Ogłoszenia", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Ogłoszenia"
+        st.rerun()
+with cols_ikony[1]:
+    if st.button("📖 Lekcja", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Realizacja"
+        st.rerun()
+with cols_ikony[2]:
+    if st.button("📊 Oceny", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Oceny"
+        st.rerun()
+with cols_ikony[3]:
+    if st.button("⚠️ Uwagi", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Uwagi"
+        st.rerun()
+with cols_ikony[4]:
+    if st.button("📋 Frekwencja", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Frekwencja"
+        st.rerun()
+with cols_ikony[5]:
+    if st.button("✉️ Wiadomości", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Wiadomości"
+        st.rerun()
+with cols_ikony[6]:
+    if st.button("📅 Plan", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Plan"
+        st.rerun()
+with cols_ikony[7]:
+    if st.button("⚙️ Profil", use_container_width=True):
+        st.session_state["librus_aktywna_zakladka"] = "Ustawienia"
+        st.rerun()
+with cols_ikony[8]:
+    if st.button("🚪 Wyloguj", use_container_width=True):
+        st.session_state["dziennik_user"] = None
+        st.session_state["dziennik_rola"] = None
+        st.rerun()
 
 st.divider()
 
@@ -452,9 +386,24 @@ akt_zakl = st.session_state["librus_aktywna_zakladka"]
 rola = st.session_state["dziennik_rola"]
 user = st.session_state["dziennik_user"]
 
-# ================= ZAKŁADKA USTAWIENIA =================
-if akt_zakl == "Ustawienia":
-    st.subheader("Ustawienia konta")
+# ================= OBSŁUGA ZAKŁADKI OGŁOSZENIA =================
+if akt_zakl == "Ogłoszenia":
+    st.subheader("Ogłoszenia szkolne")
+    df_ogl = pd.read_sql("SELECT data as [Data], tytul as [Tytuł], tresc as [Treść] FROM ogloszenia ORDER BY id DESC", conn)
+    if not df_ogl.empty:
+        for idx, row in df_ogl.iterrows():
+            st.markdown(f"""
+                <div style="background-color: #f8f9fa; padding: 10px; border-left: 4px solid #2e7d32; border-radius: 3px; margin-bottom: 10px;">
+                    <b>📅 {row['Data']} — {row['Tytuł']}</b><br>
+                    <p style="margin-top: 5px;">{row['Treść']}</p>
+                </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("Brak ogłoszeń.")
+
+# ================= OBSŁUGA ZAKŁADKI USTAWIENIA / PROFIL =================
+elif akt_zakl == "Ustawienia":
+    st.subheader("Zarządzaj profilem — Zmiana hasła")
     with st.form("form_zmien_haslo"):
         st_haslo_stare = st.text_input("Aktualne hasło:", type="password")
         st_haslo_nowe = st.text_input("Nowe hasło:", type="password")
@@ -463,27 +412,13 @@ if akt_zakl == "Ustawienia":
             c.execute("SELECT haslo FROM uzytkownicy WHERE imie_nazwisko = ?", (user,))
             db_haslo = c.fetchone()[0]
             if st_haslo_stare != db_haslo:
-                st.error("Błędne aktualne hasło.")
+                st.error("Podane aktualne hasło jest niepoprawne!")
             elif st_haslo_nowe != st_haslo_nowe_powt:
-                st.error("Nowe hasła nie zgadzają się.")
+                st.error("Nowe hasła nie zgadzają się!")
             else:
                 c.execute("UPDATE uzytkownicy SET haslo = ? WHERE imie_nazwisko = ?", (st_haslo_nowe, user))
                 conn.commit()
-                st.success("Hasło zmienione pomyślnie!")
-
-elif akt_zakl == "Ogłoszenia":
-    st.subheader("Ogłoszenia szkolne")
-    df_ogl = pd.read_sql("SELECT data as [Data], tytul as [Tytuł], tresc as [Treść] FROM ogloszenia ORDER BY id DESC", conn)
-    if not df_ogl.empty:
-        for idx, row in df_ogl.iterrows():
-            st.markdown(f"""
-                <div style="background-color: #f9f9fb; padding: 10px; border: 1px solid #dcdce0; border-radius: 2px; margin-bottom: 8px;">
-                    <b>📅 {row['Data']} — {row['Tytuł']}</b><br>
-                    <p style="margin-top: 4px;">{row['Treść']}</p>
-                </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("Brak ogłoszeń.")
+                st.success("Hasło zostało pomyślnie zmienione!")
 
 # ================= PANEL ADMINISTRATORA =================
 elif rola == "Admin":
@@ -519,7 +454,7 @@ elif rola == "Admin":
             if not df_zast_all.empty:
                 st.dataframe(df_zast_all, use_container_width=True, hide_index=True)
                 with st.form("form_usun_zastepstwo"):
-                    id_zast_del = st.selectbox("ID wpisu:", df_zast_all["id"].tolist())
+                    id_zast_del = st.selectbox("ID wpisu do usunięcia:", df_zast_all["id"].tolist())
                     if st.form_submit_button("Usuń", type="primary"):
                         c.execute("DELETE FROM zastepstwa WHERE id = ?", (id_zast_del,))
                         conn.commit()
@@ -533,7 +468,7 @@ elif rola == "Admin":
         with st.form("form_dodaj_ogloszenie"):
             og_tytul = st.text_input("Tytuł:")
             og_tresc = st.text_area("Treść:")
-            og_data = st.date_input("Data:", value=date.today())
+            og_data = st.date_input("Data publikacji:", value=date.today())
             if st.form_submit_button("Opublikuj", type="primary"):
                 if og_tytul.strip() and og_tresc.strip():
                     c.execute("INSERT INTO ogloszenia (tytul, tresc, data) VALUES (?, ?, ?)", (og_tytul, og_tresc, str(og_data)))
@@ -545,7 +480,7 @@ elif rola == "Admin":
         if not df_ogl_all.empty:
             st.dataframe(df_ogl_all, use_container_width=True, hide_index=True)
             with st.form("form_usun_ogloszenie"):
-                id_ogl_del = st.selectbox("ID ogłoszenia:", df_ogl_all["id"].tolist())
+                id_ogl_del = st.selectbox("ID ogłoszenia do usunięcia:", df_ogl_all["id"].tolist())
                 if st.form_submit_button("Usuń", type="primary"):
                     c.execute("DELETE FROM ogloszenia WHERE id = ?", (id_ogl_del,))
                     conn.commit()
@@ -569,7 +504,7 @@ elif rola == "Admin":
                     st.rerun()
 
     with adm_tab4:
-        st.subheader("Użytkownicy")
+        st.subheader("Zarządzanie Użytkownikami")
         sub_adm_t1, sub_adm_t2, sub_adm_t3 = st.tabs(["➕ Dodaj", "✏️ Edytuj", "🗑️ Usuń"])
         c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
         uczniowie_baza = [u[0] for u in c.fetchall()]
@@ -616,7 +551,7 @@ elif rola == "Admin":
             df_u_del = pd.read_sql("SELECT id, imie_nazwisko as [Imię], rola as [Rola] FROM uzytkownicy", conn)
             st.dataframe(df_u_del, use_container_width=True, hide_index=True)
             with st.form("form_usun_uzytkownika"):
-                id_u_del = st.selectbox("ID:", df_u_del["id"].tolist() if not df_u_del.empty else [0])
+                id_u_del = st.selectbox("ID użytkownika:", df_u_del["id"].tolist() if not df_u_del.empty else [0])
                 if st.form_submit_button("Usuń", type="primary"):
                     if id_u_del > 1:
                         c.execute("DELETE FROM uzytkownicy WHERE id = ?", (id_u_del,))
@@ -625,7 +560,7 @@ elif rola == "Admin":
                         st.rerun()
 
     with adm_tab5:
-        st.subheader("Przypisania")
+        st.subheader("Przypisanie nauczyciela")
         with st.form("form_przypisz"):
             c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Nauczyciel'")
             nauczyciele_l = [n[0] for n in c.fetchall()]
@@ -675,166 +610,132 @@ elif rola == "Admin":
 
 # ================= PANEL NAUCZYCIELA =================
 elif rola == "Nauczyciel":
-    if akt_zakl == "Realizacja" or akt_zakl == "Oceny" or akt_zakl == "Uwagi" or akt_zakl == "Wiadomości" or akt_zakl == "Plan" or akt_zakl == "Frekwencja":
-        
-        nauczyciel_glowne_menu = st.radio("Widok nauczyciela:", ["Dziennik lekcyjny (Tematy i Frekwencja)", "Oceny bieżące", "Uwagi", "Wiadomości", "Plan i Dyżury", "Frekwencja zestawienie"], horizontal=True)
-        
-        st.divider()
-
-        if "Dziennik lekcyjny" in nauczyciel_glowne_menu:
-            st.markdown("### Realizacja programu i Frekwencja")
-            col_d1, col_d2 = st.columns(2)
-            with col_d1:
-                data_lekcji = st.date_input("Data lekcji:", value=date.today(), key="in_data_lekcji")
-            with col_d2:
-                klasa_wyb = st.selectbox("Klasa:", ["1c"], key="in_klasa_lekcji")
-                
-            col_l1, col_l2 = st.columns(2)
-            with col_l1:
-                nr_jednostki = st.selectbox("Nr lekcji:", PELNE_GODZINY_LEKCYJNE, key="in_nr_lekcji")
-            with col_l2:
-                przedmiot_wyb = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY, key="in_przedmiot_lekcji")
-                
-            def update_temat():
-                st.session_state["lekcja_temat"] = st.session_state["widget_temat_input"]
-
-            temat_lekcji = st.text_input("Temat lekcji:", value=st.session_state["lekcja_temat"], key="widget_temat_input", on_change=update_temat)
-            st.session_state["lekcja_temat"] = temat_lekcji
+    if akt_zakl == "Realizacja" or akt_zakl == "Ogłoszenia":
+        st.markdown("### Realizacja programu — Dziennik lekcyjny i Frekwencja")
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            data_lekcji = st.date_input("Data lekcji:", value=date.today(), key="in_data_lekcji")
+        with col_d2:
+            klasa_wyb = st.selectbox("Klasa:", ["1c"], key="in_klasa_lekcji")
             
-            st.markdown("---")
-            st.markdown("### Frekwencja uczniów")
-            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (klasa_wyb,))
-            uczniowie_klas = c.fetchall()
-            frekwencja_wyniki = {}
-            if uczniowie_klas:
-                for idx, uczen in enumerate(uczniowie_klas, 1):
-                    col_u_name, col_u_radio = st.columns([2, 5])
-                    with col_u_name:
-                        st.write(f"{idx}. {uczen[0]}")
-                    with col_u_radio:
-                        status = st.radio(f"st_{uczen[0]}", ["ob", "nb", "u", "sp", "zw"], horizontal=True, label_visibility="collapsed", key=f"radio_freq_{uczen[0]}")
-                        frekwencja_wyniki[uczen[0]] = status
+        col_l1, col_l2 = st.columns(2)
+        with col_l1:
+            nr_jednostki = st.selectbox("Nr lekcji:", PELNE_GODZINY_LEKCYJNE, key="in_nr_lekcji")
+        with col_l2:
+            przedmiot_wyb = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY, key="in_przedmiot_lekcji")
             
-            if st.button("Zapisz lekcję i frekwencję", type="primary"):
-                for uczen, status in frekwencja_wyniki.items():
-                    c.execute("INSERT INTO frekwencja (uczen, data, lekcja, status) VALUES (?, ?, ?, ?)", (uczen, str(data_lekcji), nr_jednostki, status))
-                conn.commit()
-                st.success("Zapisano pomyślnie!")
+        def update_temat():
+            st.session_state["lekcja_temat"] = st.session_state["widget_temat_input"]
 
-        elif "Oceny bieżące" in nauczyciel_glowne_menu:
-            st.markdown("### Dziennik Ocen")
-            col_op1, col_op2 = st.columns(2)
-            with col_op1:
-                wybrany_przedmiot = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY)
-            with col_op2:
-                c.execute("SELECT nazwa_klasy FROM klasy")
-                klasy_baza = [k[0] for k in c.fetchall()]
-                wybrana_klasa = st.selectbox("Klasa:", klasy_baza if klasy_baza else ["1c"])
+        temat_lekcji = st.text_input("Temat lekcji:", value=st.session_state["lekcja_temat"], key="widget_temat_input", on_change=update_temat)
+        st.session_state["lekcja_temat"] = temat_lekcji
+        
+        st.markdown("---")
+        st.markdown("### Frekwencja")
+        c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (klasa_wyb,))
+        uczniowie_klas = c.fetchall()
+        frekwencja_wyniki = {}
+        if uczniowie_klas:
+            for idx, uczen in enumerate(uczniowie_klas, 1):
+                col_u_name, col_u_radio = st.columns([2, 5])
+                with col_u_name:
+                    st.write(f"{idx}. {uczen[0]}")
+                with col_u_radio:
+                    status = st.radio(f"st_{uczen[0]}", ["ob", "nb", "u", "sp", "zw"], horizontal=True, label_visibility="collapsed", key=f"radio_freq_{uczen[0]}")
+                    frekwencja_wyniki[uczen[0]] = status
+        
+        if st.button("Zapisz lekcję i frekwencję", type="primary"):
+            for uczen, status in frekwencja_wyniki.items():
+                c.execute("INSERT INTO frekwencja (uczen, data, lekcja, status) VALUES (?, ?, ?, ?)", (uczen, str(data_lekcji), nr_jednostki, status))
+            conn.commit()
+            st.success("Zapisano pomyślnie!")
 
-            nauczyciel_tabs = st.tabs(["Tabela ocen", "Wystaw ocenę", "Edytuj / Usuń"])
+    elif akt_zakl == "Oceny":
+        st.markdown("### Dziennik Ocen")
+        col_op1, col_op2 = st.columns(2)
+        with col_op1:
+            wybrany_przedmiot = st.selectbox("Przedmiot:", WSZYSTKIE_PRZEDMIOTY)
+        with col_op2:
+            c.execute("SELECT nazwa_klasy FROM klasy")
+            klasy_baza = [k[0] for k in c.fetchall()]
+            wybrana_klasa = st.selectbox("Klasa:", klasy_baza if klasy_baza else ["1c"])
 
-            with nauczyciel_tabs[0]:
+        st.markdown("---")
+        nauczyciel_tabs = st.tabs(["Tabela ocen", "Wystaw ocenę", "Edytuj / Usuń"])
+
+        with nauczyciel_tabs[0]:
+            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (wybrana_klasa,))
+            uczniowie_klasy = c.fetchall()
+            if uczniowie_klasy:
+                tabela_wiersze = []
+                for idx, uczen_row in enumerate(uczniowie_klasy, 1):
+                    u_nazwisko = uczen_row[0]
+                    df_oceny_u = pd.read_sql("SELECT ocena FROM oceny WHERE uczen = ? AND przedmiot = ?", conn, params=(u_nazwisko, wybrany_przedmiot))
+                    badge_list = [f'<span class="grade-badge g-{r.ocena}">{r.ocena}</span>' for r in df_oceny_u.itertuples()] if not df_oceny_u.empty else ['<span style="color:gray;">Brak</span>']
+                    tabela_wiersze.append({"Nr": idx, "Uczeń": u_nazwisko, "Oceny": " ".join(badge_list)})
+                st.write(pd.DataFrame(tabela_wiersze).to_html(escape=False, index=False), unsafe_allow_html=True)
+
+        with nauczyciel_tabs[1]:
+            with st.form("form_wystaw_ocene"):
                 c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (wybrana_klasa,))
-                uczniowie_klasy = c.fetchall()
-                if uczniowie_klasy:
-                    tabela_wiersze = []
-                    for idx, uczen_row in enumerate(uczniowie_klasy, 1):
-                        u_nazwisko = uczen_row[0]
-                        df_oceny_u = pd.read_sql("SELECT ocena FROM oceny WHERE uczen = ? AND przedmiot = ?", conn, params=(u_nazwisko, wybrany_przedmiot))
-                        badge_list = [f'<span class="grade-badge g-{r.ocena}">{r.ocena}</span>' for r in df_oceny_u.itertuples()] if not df_oceny_u.empty else ['<span style="color:gray;">Brak</span>']
-                        tabela_wiersze.append({"Nr": idx, "Uczeń": u_nazwisko, "Oceny": " ".join(badge_list)})
-                    st.write(pd.DataFrame(tabela_wiersze).to_html(escape=False, index=False), unsafe_allow_html=True)
-
-            with nauczyciel_tabs[1]:
-                with st.form("form_wystaw_ocene"):
-                    c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE klasa = ? AND rola = 'Uczeń'", (wybrana_klasa,))
-                    uczniowie_l = [u[0] for u in c.fetchall()]
-                    uczen_docelowy = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Brak"])
-                    ocena_val = st.selectbox("Ocena:", ["0", "1", "2", "3", "4", "5", "6", "np"], index=5)
-                    kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=7)
-                    waga_val = st.number_input("Waga:", min_value=1, max_value=10, value=5)
-                    komentarz_val = st.text_area("Komentarz:")
-                    if st.form_submit_button("Zapisz", type="primary"):
-                        c.execute("INSERT INTO oceny (uczen, przedmiot, ocena, waga, kategoria, data, komentarz) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                  (uczen_docelowy, wybrany_przedmiot, ocena_val, waga_val, kategoria_val, str(date.today()), komentarz_val))
-                        conn.commit()
-                        st.success("Wystawiono ocenę!")
-                        st.rerun()
-
-            with nauczyciel_tabs[2]:
-                df_w_o = pd.read_sql("SELECT id, uczen, ocena, kategoria FROM oceny WHERE przedmiot = ?", conn, params=(wybrany_przedmiot,))
-                if not df_w_o.empty:
-                    st.dataframe(df_w_o, use_container_width=True, hide_index=True)
-                    with st.form("form_del_ocena"):
-                        id_o_del = st.selectbox("ID oceny do usunięcia:", df_w_o["id"].tolist())
-                        if st.form_submit_button("Usuń", type="primary"):
-                            c.execute("DELETE FROM oceny WHERE id = ?", (id_o_del,))
-                            conn.commit()
-                            st.success("Usunięto!")
-                            st.rerun()
-
-        elif "Uwagi" in nauczyciel_glowne_menu:
-            with st.form("form_uwaga"):
-                c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
                 uczniowie_l = [u[0] for u in c.fetchall()]
-                uw_uczen = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
-                uw_typ = st.selectbox("Typ:", ["Pozytywna", "Neutralna", "Negatywna"])
-                uw_tresc = st.text_area("Treść:")
-                if st.form_submit_button("Dodaj uwagę", type="primary"):
-                    c.execute("INSERT INTO uwagi (uczen, nauczyciel, typ, tresc, data) VALUES (?, ?, ?, ?, ?)", (uw_uczen, user, uw_typ, uw_tresc, str(date.today())))
+                uczen_docelowy = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Brak"])
+                ocena_val = st.selectbox("Ocena:", ["0", "1", "2", "3", "4", "5", "6", "np"], index=5)
+                kategoria_val = st.selectbox("Kategoria:", KATEGORIE_OCEN, index=7)
+                waga_val = st.number_input("Waga:", min_value=1, max_value=10, value=5)
+                komentarz_val = st.text_area("Komentarz:")
+                if st.form_submit_button("Zapisz", type="primary"):
+                    c.execute("INSERT INTO oceny (uczen, przedmiot, ocena, waga, kategoria, data, komentarz) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                              (uczen_docelowy, wybrany_przedmiot, ocena_val, waga_val, kategoria_val, str(date.today()), komentarz_val))
                     conn.commit()
-                    st.success("Dodano!")
+                    st.success("Wystawiono ocenę!")
                     st.rerun()
 
-        elif "Wiadomości" in nauczyciel_glowne_menu:
-            renderuj_zakladke_wiadomosci(user)
+        with nauczyciel_tabs[2]:
+            df_w_o = pd.read_sql("SELECT id, uczen, ocena, kategoria FROM oceny WHERE przedmiot = ?", conn, params=(wybrany_przedmiot,))
+            if not df_w_o.empty:
+                st.dataframe(df_w_o, use_container_width=True, hide_index=True)
+                with st.form("form_del_ocena"):
+                    id_o_del = st.selectbox("ID oceny do usunięcia:", df_w_o["id"].tolist())
+                    if st.form_submit_button("Usuń", type="primary"):
+                        c.execute("DELETE FROM oceny WHERE id = ?", (id_o_del,))
+                        conn.commit()
+                        st.success("Usunięto!")
+                        st.rerun()
 
-        elif "Plan i Dyżury" in nauczyciel_glowne_menu:
-            renderuj_tabelue_planu_dla_klasy("1c", allow_change=True)
-
-        elif "Frekwencja zestawienie" in nauczyciel_glowne_menu:
-            df_fr = pd.read_sql("SELECT uczen as [Uczeń], data as [Data], status as [Status] FROM frekwencja", conn)
-            st.dataframe(df_fr, use_container_width=True, hide_index=True)
-
-# ================= PANEL UCZNIA =================
-elif rola == "Uczeń":
-    c.execute("SELECT klasa FROM uzytkownicy WHERE imie_nazwisko = ?", (user,))
-    res_ku = c.fetchone()
-    klasa_ucz = res_ku[0] if res_ku and res_ku[0] != "-" else "1c"
-
-    if akt_zakl == "Oceny":
-        renderuj_tabelue_ocen_dla_ucznia(user)
-    elif akt_zakl == "Plan":
-        renderuj_tabelue_planu_dla_klasy(klasa_ucz)
-    elif akt_zakl == "Wiadomości":
-        renderuj_zakladke_wiadomosci(user)
     elif akt_zakl == "Uwagi":
-        st.subheader("Moje uwagi")
-        df_uw = pd.read_sql("SELECT data as [Data], typ as [Typ], tresc as [Treść] FROM uwagi WHERE uczen = ?", conn, params=(user,))
-        if not df_uw.empty:
-            st.dataframe(df_uw, use_container_width=True, hide_index=True)
-        else:
-            st.info("Brak uwag.")
-    elif akt_zakl == "Frekwencja":
-        st.subheader("Moja frekwencja")
-        df_f_ucz = pd.read_sql("SELECT data as [Data], status as [Status] FROM frekwencja WHERE uczen = ?", conn, params=(user,))
-        if not df_f_ucz.empty:
-            st.dataframe(df_f_ucz, use_container_width=True, hide_index=True)
-        else:
-            st.info("Brak frekwencji.")
+        with st.form("form_uwaga"):
+            c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
+            uczniowie_l = [u[0] for u in c.fetchall()]
+            uw_uczen = st.selectbox("Uczeń:", uczniowie_l if uczniowie_l else ["Emilia Widomska"])
+            uw_typ = st.selectbox("Typ:", ["Pozytywna", "Neutralna", "Negatywna"])
+            uw_tresc = st.text_area("Treść:")
+            if st.form_submit_button("Dodaj uwagę", type="primary"):
+                c.execute("INSERT INTO uwagi (uczen, nauczyciel, typ, tresc, data) VALUES (?, ?, ?, ?, ?)", (uw_uczen, user, uw_typ, uw_tresc, str(date.today())))
+                conn.commit()
+                st.success("Dodano!")
+                st.rerun()
 
-# ================= PANEL RODZICA =================
-elif rola == "Rodzic":
-    c.execute("SELECT powiazany_uczen FROM uzytkownicy WHERE imie_nazwisko = ?", (user,))
-    res_p = c.fetchone()
-    dziecko = res_p[0] if res_p and res_p[0] != "-" else "Emilia Widomska"
-    
-    st.subheader(f"Panel Rodzica — Podgląd dziecka: {dziecko}")
-    
-    if akt_zakl == "Oceny":
-        renderuj_tabelue_ocen_dla_ucznia(dziecko)
+    elif akt_zakl == "Wiadomości":
+        renderuj_zakladke_wiadomosci(user)
+    elif akt_zakl == "Plan":
+        renderuj_tabelue_planu_dla_klasy("1c", allow_change=True)
+    elif akt_zakl == "Frekwencja":
+        df_fr = pd.read_sql("SELECT uczen as [Uczeń], data as [Data], status as [Status] FROM frekwencja", conn)
+        st.dataframe(df_fr, use_container_width=True, hide_index=True)
+
+# ================= PANEL UCZNIA / RODZICA =================
+elif rola in ["Uczeń", "Rodzic"]:
+    cel_ucznia = user if rola == "Uczeń" else c.execute("SELECT powiazany_uczen FROM uzytkownicy WHERE imie_nazwisko = ?", (user,)).fetchone()[0]
+    if akt_zakl in ["Oceny", "Ogłoszenia"]:
+        renderuj_tabelue_ocen_dla_ucznia(cel_ucznia)
+    elif akt_zakl == "Plan":
+        renderuj_tabelue_planu_dla_klasy("1c")
     elif akt_zakl == "Wiadomości":
         renderuj_zakladke_wiadomosci(user)
     elif akt_zakl == "Frekwencja":
-        df_f_d = pd.read_sql("SELECT data as [Data], status as [Status] FROM frekwencja WHERE uczen = ?", conn, params=(dziecko,))
-        st.dataframe(df_f_d, use_container_width=True, hide_index=True)
+        df_f = pd.read_sql("SELECT data as [Data], status as [Status] FROM frekwencja WHERE uczen = ?", conn, params=(cel_ucznia,))
+        st.dataframe(df_f, use_container_width=True, hide_index=True)
+    elif akt_zakl == "Uwagi":
+        df_u = pd.read_sql("SELECT data as [Data], typ as [Typ], tresc as [Treść] FROM uwagi WHERE uczen = ?", conn, params=(cel_ucznia,))
+        st.dataframe(df_u, use_container_width=True, hide_index=True)
