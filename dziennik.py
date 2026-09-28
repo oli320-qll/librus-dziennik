@@ -7,7 +7,7 @@ from datetime import date
 PRZERWA_TECHNICZNA = False
 
 if PRZERWA_TECHNICZNA:
-    st.warning("⚠️ **Przerwa techniczna!** System Librus jest obecnie niedostępny z powodu prac konserwacyjnych. Zapraszamy w godzinach od 12:00 do 13:00.")
+    st.warning("⚠️ **Przerwa techniczna!** System Librus jest obecnie niedostępny z powodu prac konserwacyjnych. Zapraszamy w godzinach od 12:00 do 14:00.")
     st.stop()
 # =============================================================
 
@@ -83,6 +83,7 @@ c.execute("CREATE TABLE IF NOT EXISTS plan_lekcji (id INTEGER PRIMARY KEY AUTOIN
 c.execute("CREATE TABLE IF NOT EXISTS zastepstwa (id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT, klasa TEXT, nr_lekcji TEXT, stary_przedmiot TEXT, nowy_przedmiot TEXT, nauczyciel TEXT, informacja TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS dyzury (id INTEGER PRIMARY KEY AUTOINCREMENT, osoba TEXT, miejsce TEXT, dzien TEXT, godzina TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS oceny_zachowania (id INTEGER PRIMARY KEY AUTOINCREMENT, uczen TEXT, okres TEXT, ocena TEXT, opis TEXT)")
+c.execute("CREATE TABLE IF NOT EXISTS ogloszenia (id INTEGER PRIMARY KEY AUTOINCREMENT, tytul TEXT, tresc TEXT, data TEXT)")
 conn.commit()
 
 # Bezpieczna migracja kolumn
@@ -99,7 +100,7 @@ for tabela, kolumna, typ in migracje:
     except sqlite3.OperationalError:
         pass
 
-# Dane startowe uruchamiane tylko wtedy, gdy baza jest całkowicie pusta
+# Dane startowe uruchamiane tylko w nowej bazie
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
 if c.fetchone()[0] == 0:
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Administrator", "admin", "admin123", "Admin", "-", "-"))
@@ -120,6 +121,11 @@ if c.fetchone()[0] == 0:
                   
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Jan Widomski", "rodzic_emilia", "rodzic123", "Rodzic", "1c", "Emilia Widomska"))
     c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c", "Olivier"))
+    conn.commit()
+
+c.execute("SELECT COUNT(*) FROM ogloszenia")
+if c.fetchone()[0] == 0:
+    c.execute("INSERT INTO ogloszenia (tytuł, tresc, data) VALUES (?, ?, ?)", ("Witamy w nowym semestrze!", "Zapraszamy do korzystania z dziennika elektronicznego Synergia.", str(date.today())))
     conn.commit()
 
 c.execute("SELECT COUNT(*) FROM plan_lekcji")
@@ -182,16 +188,11 @@ def renderuj_tabelue_planu_dla_klasy(docelowa_klasa, allow_change=False):
 
     st.markdown(f"### Plan lekcji oraz Odwołania — Klasa: **{wybrana_klasa}**")
     
-    # Pobieramy bazowy plan lekcji
     df_p = pd.read_sql("SELECT dzien, nr_lekcji, przedmiot FROM plan_lekcji WHERE klasa = ?", conn, params=(wybrana_klasa,))
-    
-    # Pobieramy informacje o zastępstwach / odwołaniach dla tej klasy
     df_z = pd.read_sql("SELECT nr_lekcji, nowy_przedmiot, informacja FROM zastepstwa WHERE klasa = ?", conn, params=(wybrana_klasa,))
     
-    # Jeśli są wpisy zastępstw/odwołań, nakładamy je na plan
     if not df_p.empty and not df_z.empty:
         zast_dict = {row.nr_lekcji: (row.nowy_przedmiot, row.informacja) for row in df_z.itertuples()}
-        # Podmieniamy przedmioty w planie jeśli występuje odwołanie/zastępstwo
         df_p['przedmiot'] = df_p.apply(lambda r: f"🚫 {zast_dict[r['nr_lekcji']][0]} ({zast_dict[r['nr_lekcji']][1]})" if r['nr_lekcji'] in zast_dict else r['przedmiot'], axis=1)
 
     if not df_p.empty:
@@ -303,14 +304,15 @@ def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
 # ================= EKRAN LOGOWANIA =================
 if st.session_state["dziennik_user"] is None:
     st.markdown("""
-        <div style="text-align: center; padding: 40px 10px;">
+        <div style="text-align: center; padding: 30px 10px 10px 10px;">
             <h1 style="color: #6b2d5c; font-size: 38px;">Synergia <b>Librus</b></h1>
             <p style="color: gray; font-size: 14px;">Zdalny Dziennik Szkolny</p>
         </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 1.3, 1])
+    col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
+        # Panel logowania
         with st.form("form_logowania"):
             st.subheader("Logowanie do systemu")
             login_in = st.text_input("Login:")
@@ -330,13 +332,29 @@ if st.session_state["dziennik_user"] is None:
                         st.rerun()
                 else:
                     st.error("Błędny login lub hasło!")
+
+        # Ogłoszenia publiczne przed logowaniem
+        st.markdown("---")
+        st.subheader("📢 Ogłoszenia szkolne")
+        df_ogloszenia_pub = pd.read_sql("SELECT data as [Data], tytul as [Tytuł], tresc as [Treść] FROM ogloszenia ORDER BY id DESC", conn)
+        if not df_ogloszenia_pub.empty:
+            for idx, row in df_ogloszenia_pub.iterrows():
+                st.markdown(f"""
+                    <div style="background-color: #f8f9fa; padding: 10px; border-left: 4px solid #6b2d5c; border-radius: 3px; margin-bottom: 8px; font-size: 13px;">
+                        <b>📅 {row['Data']} — {row['Tytuł']}</b><br>
+                        <p style="margin-top: 4px; margin-bottom: 0px;">{row['Treść']}</p>
+                    </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("Brak ogłoszeń szkolnych.")
+
     st.stop()
 
 # ================= NAGŁÓWEK SYSTEMOWY LIBRUS =================
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-25 12:50</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-28 11:00</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -413,11 +431,10 @@ if akt_zakl == "Ustawienia":
 # ================= PANEL ADMINISTRATORA =================
 elif rola == "Admin":
     st.subheader("Panel Administratora")
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6, adm_tab7 = st.tabs(["Zastępstwa / Odwołania", "Oceny Zachowania", "Użytkownicy", "Przypisania", "📅 Plan lekcji", "🛡️ Dyżury", "Wiadomości"])
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6, adm_tab7, adm_tab8 = st.tabs(["Zastępstwa / Odwołania", "📢 Ogłoszenia", "Oceny Zachowania", "Użytkownicy", "Przypisania", "📅 Plan lekcji", "🛡️ Dyżury", "Wiadomości"])
     
     with adm_tab1:
         st.subheader("Zarządzanie Zastępstwami i Odwołaniami Lekcji")
-        
         tryb_zast = st.radio("Wybierz akcję:", ["Dodaj zastępstwo / odwołanie", "Usuń zastępstwo / odwołanie"], horizontal=True)
         
         if tryb_zast == "Dodaj zastępstwo / odwołanie":
@@ -432,7 +449,7 @@ elif rola == "Admin":
                 if typ_zmiany == "🚫 Odwołanie lekcji":
                     z_nowy = "Lekcja odwołana"
                     z_nauczyciel = "-"
-                    z_info = st.text_input("Informacja o odwołaniu (np. Nieobecność nauczyciela):", value="Lekcja odwołana")
+                    z_info = st.text_input("Informacja o odwołaniu:", value="Lekcja odwołana")
                 else:
                     z_nowy = st.text_input("Nowy przedmiot:")
                     z_nauczyciel = st.text_input("Zastępujący nauczyciel:")
@@ -449,7 +466,7 @@ elif rola == "Admin":
             if not df_zast_all.empty:
                 st.dataframe(df_zast_all, use_container_width=True, hide_index=True)
                 with st.form("form_usun_zastepstwo"):
-                    id_zast_del = st.selectbox("Wybierz ID wpisu do usunięcia (cofnięcie odwołania/zastępstwa):", df_zast_all["id"].tolist())
+                    id_zast_del = st.selectbox("Wybierz ID wpisu do usunięcia:", df_zast_all["id"].tolist())
                     if st.form_submit_button("Usuń wpis / Przywróć plan", type="primary"):
                         c.execute("DELETE FROM zastepstwa WHERE id = ?", (id_zast_del,))
                         conn.commit()
@@ -459,6 +476,36 @@ elif rola == "Admin":
                 st.info("Brak aktywnych zastępstw lub odwołań w bazie.")
 
     with adm_tab2:
+        st.subheader("Zarządzanie Ogłoszeniami Szkolnymi (widocznymi również przed logowaniem)")
+        with st.form("form_dodaj_ogloszenie"):
+            og_tytul = st.text_input("Tytuł ogłoszenia:")
+            og_tresc = st.text_area("Treść ogłoszenia:")
+            og_data = st.date_input("Data publikacji:", value=date.today())
+            if st.form_submit_button("Opublikuj ogłoszenie", type="primary"):
+                if og_tytul.strip() and og_tresc.strip():
+                    c.execute("INSERT INTO ogloszenia (tytul, tresc, data) VALUES (?, ?, ?)", (og_tytul, og_tresc, str(og_data)))
+                    conn.commit()
+                    st.success("Opublikowano ogłoszenie pomyślnie!")
+                    st.rerun()
+                else:
+                    st.error("Tytuł i treść nie mogą być puste!")
+
+        st.markdown("---")
+        st.write("### Usuwanie ogłoszeń")
+        df_ogl_all = pd.read_sql("SELECT id, data as [Data], tytul as [Tytuł] FROM ogloszenia", conn)
+        if not df_ogl_all.empty:
+            st.dataframe(df_ogl_all, use_container_width=True, hide_index=True)
+            with st.form("form_usun_ogloszenie"):
+                id_ogl_del = st.selectbox("Wybierz ID ogłoszenia do usunięcia:", df_ogl_all["id"].tolist())
+                if st.form_submit_button("Usuń ogłoszenie", type="primary"):
+                    c.execute("DELETE FROM ogloszenia WHERE id = ?", (id_ogl_del,))
+                    conn.commit()
+                    st.success("Usunięto ogłoszenie!")
+                    st.rerun()
+        else:
+            st.info("Brak ogłoszeń w bazie.")
+
+    with adm_tab3:
         st.subheader("Zarządzanie Ocenami z Zachowania")
         with st.form("form_dodaj_zachowanie"):
             c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
@@ -489,7 +536,7 @@ elif rola == "Admin":
         else:
             st.info("Brak ocen z zachowania w bazie.")
 
-    with adm_tab3:
+    with adm_tab4:
         st.subheader("Zarządzanie Użytkownikami")
         sub_adm_t1, sub_adm_t2, sub_adm_t3 = st.tabs(["➕ Dodaj użytkownika", "✏️ Edytuj użytkownika", "🗑️ Usuń użytkownika"])
         
@@ -531,7 +578,7 @@ elif rola == "Admin":
                 
                 with st.form("form_edytuj_uzytkownika"):
                     ed_imie = st.text_input("Imię i nazwisko:", value=dane_u[0])
-                    ed_login = st.text_input("Login (wpisz 'brak', aby zablokować logowanie):", value=dane_u[1])
+                    ed_login = st.text_input("Login:", value=dane_u[1])
                     ed_haslo = st.text_input("Hasło:", value=dane_u[2])
                     role_lista = ["Admin", "Nauczyciel", "Uczeń", "Rodzic"]
                     ed_rola = st.selectbox("Rola:", role_lista, index=role_lista.index(dane_u[3]) if dane_u[3] in role_lista else 0)
@@ -563,14 +610,13 @@ elif rola == "Admin":
                         st.success("Usunięto użytkownika!")
                         st.rerun()
                     else:
-                        st.error("Nie można usunąć głównego administratora systemowego (ID 1)!")
+                        st.error("Nie można usunąć głównego administratora (ID 1)!")
 
-    with adm_tab4:
+    with adm_tab5:
         st.subheader("Przypisanie nauczyciela do przedmiotu i klasy")
         with st.form("form_przypisz_nauczyciela"):
             c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Nauczyciel'")
             nauczyciele_l = [n[0] for n in c.fetchall()]
-            
             c.execute("SELECT nazwa_klasy FROM klasy")
             klasy_l = [k[0] for k in c.fetchall()]
             
@@ -600,7 +646,7 @@ elif rola == "Admin":
         else:
             st.info("Brak przypisań w bazie.")
 
-    with adm_tab5:
+    with adm_tab6:
         st.subheader("Zarządzanie Planem Lekcji")
         with st.form("form_dodaj_plan_lekcji"):
             c.execute("SELECT nazwa_klasy FROM klasy")
@@ -633,15 +679,15 @@ elif rola == "Admin":
         else:
             st.info("Brak wpisów w planie lekcji.")
 
-    with adm_tab6:
+    with adm_tab7:
         st.subheader("Zarządzanie Dyżurami Nauczycieli")
         with st.form("form_dodaj_dyzur"):
             c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Nauczyciel'")
             nauczyciele_l = [n[0] for n in c.fetchall()]
             dyz_osoba = st.selectbox("Nauczyciel:", nauczyciele_l if nauczyciele_l else ["Olivier"])
-            dyz_miejsce = st.text_input("Miejsce dyżuru (np. Parter — Wejście główne):")
+            dyz_miejsce = st.text_input("Miejsce dyżuru:")
             dyz_dzien = st.selectbox("Dzień:", DNI_TYGODNIA)
-            dyz_godzina = st.text_input("Godzina / Przerwa (np. Przerwa 09:40 - 09:50):")
+            dyz_godzina = st.text_input("Godzina / Przerwa:")
             
             if st.form_submit_button("Dodaj dyżur", type="primary"):
                 c.execute("INSERT INTO dyzury (osoba, miejsce, dzien, godzina) VALUES (?, ?, ?, ?)",
@@ -665,7 +711,7 @@ elif rola == "Admin":
         else:
             st.info("Brak zdefiniowanych dyżurów.")
 
-    with adm_tab7:
+    with adm_tab8:
         renderuj_zakladke_wiadomosci("Administrator")
 
 # ================= PANEL NAUCZYCIELA =================
@@ -809,7 +855,6 @@ elif rola == "Nauczyciel":
             
             if not df_wszystkie_oceny.empty:
                 st.dataframe(df_wszystkie_oceny, use_container_width=True, hide_index=True)
-                
                 wybrane_id_oceny = st.selectbox("Wybierz ID oceny do edycji / usunięcia:", df_wszystkie_oceny["id"].tolist())
                 
                 c.execute("SELECT uczen, przedmiot, ocena, waga, kategoria, data, komentarz FROM oceny WHERE id = ?", (wybrane_id_oceny,))
@@ -851,7 +896,6 @@ elif rola == "Nauczyciel":
 
     elif akt_zakl == "Uwagi":
         st.subheader("Wpisywanie uwag (w tym tryb seryjny)")
-        
         tryb_uwag = st.radio("Wybierz tryb wpisywania uwag:", ["Pojedyncza uwaga", "Seryjne dodawanie uwag dla całej klasy"], horizontal=True)
         
         if tryb_uwag == "Pojedyncza uwaga":
@@ -872,7 +916,6 @@ elif rola == "Nauczyciel":
                 c.execute("SELECT nazwa_klasy FROM klasy")
                 klasy_s_l = [k[0] for k in c.fetchall()]
                 s_klasa = st.selectbox("Wybierz klasę do wpisów seryjnych:", klasy_s_l if klasy_s_l else ["1c"])
-                
                 s_typ = st.selectbox("Typ uwagi dla zaznaczonych:", ["Pozytywna", "Neutralna", "Negatywna"])
                 s_tresc = st.text_area("Treść uwagi (wspólna):")
                 
