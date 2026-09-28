@@ -91,7 +91,8 @@ migracje = [
     ("oceny", "kategoria", "TEXT"),
     ("oceny", "komentarz", "TEXT"),
     ("uzytkownicy", "klasa", "TEXT"),
-    ("uzytkownicy", "powiazany_uczen", "TEXT")
+    ("uzytkownicy", "powiazany_uczen", "TEXT"),
+    ("ogloszenia", "tytul", "TEXT")
 ]
 for tabela, kolumna, typ in migracje:
     try:
@@ -125,7 +126,7 @@ if c.fetchone()[0] == 0:
 
 c.execute("SELECT COUNT(*) FROM ogloszenia")
 if c.fetchone()[0] == 0:
-    c.execute("INSERT INTO ogloszenia (tytuł, tresc, data) VALUES (?, ?, ?)", ("Witamy w nowym semestrze!", "Zapraszamy do korzystania z dziennika elektronicznego Synergia.", str(date.today())))
+    c.execute("INSERT INTO ogloszenia (tytul, tresc, data) VALUES (?, ?, ?)", ("Witamy w nowym semestrze!", "Zapraszamy do korzystania z dziennika elektronicznego Synergia.", str(date.today())))
     conn.commit()
 
 c.execute("SELECT COUNT(*) FROM plan_lekcji")
@@ -312,7 +313,6 @@ if st.session_state["dziennik_user"] is None:
 
     col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
-        # Panel logowania
         with st.form("form_logowania"):
             st.subheader("Logowanie do systemu")
             login_in = st.text_input("Login:")
@@ -333,7 +333,6 @@ if st.session_state["dziennik_user"] is None:
                 else:
                     st.error("Błędny login lub hasło!")
 
-        # Ogłoszenia publiczne przed logowaniem
         st.markdown("---")
         st.subheader("📢 Ogłoszenia szkolne")
         df_ogloszenia_pub = pd.read_sql("SELECT data as [Data], tytul as [Tytuł], tresc as [Treść] FROM ogloszenia ORDER BY id DESC", conn)
@@ -354,7 +353,7 @@ if st.session_state["dziennik_user"] is None:
 st.markdown("""
     <div class="librus-header-main">
         <div class="librus-logo-text">Synergia <sub>Librus</sub></div>
-        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-28 11:00</div>
+        <div style="font-size: 12px; color: #555;">ostatnie logowanie: 2026-09-28 11:05</div>
     </div>
 """, unsafe_allow_html=True)
 
