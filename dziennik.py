@@ -97,11 +97,8 @@ except sqlite3.OperationalError:
 c.execute("SELECT COUNT(*) FROM uzytkownicy")
 if c.fetchone()[0] == 0:
     c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Administrator", "admin", "admin123", "Admin", "-", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Alicja Ołowniuk", "alicja", "admin123", "Nauczyciel", "7c SP5", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Olivier", "olivier", "admin123", "Nauczyciel", "1c SP5", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Emilia Nowak", "emilia", "emilia123", "Uczeń", "1c SP5", "-"))
-    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Jan Nowak (Rodzic)", "rodzic_emilia", "rodzic123", "Rodzic", "1c SP5", "Emilia Nowak"))
-    c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("7c SP5", "Alicja Ołowniuk"))
+    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Olivier", "olivier", "widomskioliviern", "Nauczyciel", "1c SP5", "-"))
+    c.execute("INSERT INTO uzytkownicy (imie_nazwisko, login, haslo, rola, klasa, powiazany_uczen) VALUES (?, ?, ?, ?, ?, ?)", ("Emilia Widomska", "emilia", "emilia123", "Uczeń", "1c SP5", "-"))
     c.execute("INSERT INTO klasy (nazwa_klasy, wychowawca) VALUES (?, ?)", ("1c SP5", "Olivier"))
     conn.commit()
 
