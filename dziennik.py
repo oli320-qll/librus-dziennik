@@ -1099,6 +1099,74 @@ elif st.session_state["dziennik_rola"] == "Nauczyciel":
               f" ucznia {wybrany_uczen}!"
           )
           st.rerun()
+
+    # --- SEKCJA PODGLĄDU I POPRAWY OCEN ---
+    st.markdown("---")
+    with st.expander(f"Edycja oceny / Poprawa oceny ({o_przedmiot})"):
+      df_istniejace = pd.read_sql(
+          "SELECT id, uczen as [Uczeń], przedmiot as [Przedmiot], ocena as"
+          " [Ocena], waga as [Waga], kategoria as [Kategoria], data as [Data],"
+          " komentarz as [Komentarz] FROM oceny WHERE przedmiot = ?",
+          conn,
+          params=(o_przedmiot,),
+      )
+      if not df_istniejace.empty:
+        st.dataframe(df_istniejace, use_container_width=True, hide_index=True)
+        with st.form("form_edytuj_lub_usun_ocene"):
+          ocena_id_do_edycji = st.selectbox(
+              "Wybierz ID oceny do edycji / poprawy:",
+              df_istniejace["id"].tolist(),
+          )
+          col_e1, col_e2, col_e3 = st.columns(3)
+          with col_e1:
+            nowa_kategoria = st.selectbox(
+                "Nowa kategoria:", KATEGORIE_OCEN
+            )
+            nowa_wartosc = st.selectbox(
+                "Nowa ocena:",
+                [6, 5, 4, 3, 2, 1, 0],
+                format_func=lambda x: "0 (Brak/NP)" if x == 0 else str(x),
+            )
+          with col_e2:
+            nowa_waga = st.number_input(
+                "Nowa waga:", min_value=1, max_value=10, value=5
+            )
+            nowa_data = st.date_input("Nowa data:", value=date.today())
+          with col_e3:
+            nowy_komentarz = st.text_input("Nowy komentarz:", value="")
+          akcja_wyb = st.radio(
+              "Akcja:", ["Zaktualizuj / Popraw", "Usuń ocenę"], horizontal=True
+          )
+          btn_wykonaj_edycje = st.form_submit_button(
+              "Wykonaj w systemie", type="primary"
+          )
+          if btn_wykonaj_edycje:
+            if akcja_wyb == "Zaktualizuj / Popraw":
+              c.execute(
+                  "UPDATE oceny SET ocena = ?, waga = ?, kategoria = ?, data ="
+                  " ?, komentarz = ? WHERE id = ?",
+                  (
+                      nowa_wartosc,
+                      nowa_waga,
+                      nowa_kategoria,
+                      str(nowa_data),
+                      nowy_komentarz,
+                      ocena_id_do_edycji,
+                  ),
+              )
+              conn.commit()
+              st.success(
+                  f"Zaktualizowano / poprawiono ocenę (ID: {ocena_id_do_edycji})!"
+              )
+              st.rerun()
+            else:
+              c.execute("DELETE FROM oceny WHERE id = ?", (ocena_id_do_edycji,))
+              conn.commit()
+              st.success(f"Usunięto ocenę (ID: {ocena_id_do_edycji})!")
+              st.rerun()
+      else:
+        st.info(f"Brak wystawionych ocen z przedmiotu: {o_przedmiot}.")
+
   elif akt_zakl == "Frekwencja":
     df_all_f = pd.read_sql(
         "SELECT id, uczen as [Uczeń], data as [Data], lekcja as [Lekcja],"
