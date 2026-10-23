@@ -64,7 +64,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-conn = sqlite3.connect("dziennik_szkolny.db", check_same_thread=False)
+conn = sqlite3.connect("dziennik_szkolny_v2.db", check_same_thread=False)
 c = conn.cursor()
 
 # Inicjalizacja tabel
