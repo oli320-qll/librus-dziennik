@@ -65,7 +65,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-conn = sqlite3.connect("dziennik_szkolny.dbv2", check_same_thread=False)
+conn = sqlite3.connect("dziennik_szkolny.db", check_same_thread=False)
 c = conn.cursor()
 
 # Inicjalizacja tabel
@@ -593,7 +593,7 @@ if akt_zakl == "Ustawienia":
       elif not st_haslo_nowe or len(st_haslo_nowe) < 4:
         st.error("Nowe hasło musi mieć co najmniej 4 znaki!")
       elif st_haslo_nowe != st_haslo_nowe_powt:
-        st.error("Nowe hasła nie zgadzają się!")
+        st.error("Nowe hasła nie zgadjają się!")
       else:
         c.execute(
             "UPDATE uzytkownicy SET haslo = ? WHERE imie_nazwisko = ?",
@@ -1074,16 +1074,28 @@ elif st.session_state["dziennik_rola"] == "Nauczyciel":
           "Wybierz klasę do oceny:", klasy_do_ocen if klasy_do_ocen else ["1c SP5"]
       )
     with col_p2:
+      # FILTROWANIE: Pobieranie tylko przedmiotów przypisanych do zalogowanego nauczyciela
       c.execute(
-          "SELECT DISTINCT przedmiot FROM plan_lekcji WHERE klasa = ?",
-          (o_klasa,),
+          "SELECT DISTINCT przedmiot FROM przypisania WHERE nauczyciel = ?"
+          " AND klasa = ?",
+          (st.session_state["dziennik_user"], o_klasa),
       )
-      przedmioty_z_planu = [p[0] for p in c.fetchall()]
-      if not przedmioty_z_planu:
-        przedmioty_z_planu = WSZYSTKIE_PRZEDMIOTY
+      przedmioty_nauczyciela = [p[0] for p in c.fetchall()]
+
+      if not przedmioty_nauczyciela:
+        c.execute(
+            "SELECT DISTINCT przedmiot FROM plan_lekcji WHERE klasa = ?",
+            (o_klasa,),
+        )
+        przedmioty_nauczyciela = [p[0] for p in c.fetchall()]
+
+      if not przedmioty_nauczyciela:
+        przedmioty_nauczyciela = WSZYSTKIE_PRZEDMIOTY
+
       o_przedmiot = st.selectbox(
-          "Przedmiot z terminarza (Planu lekcji):", przedmioty_z_planu
+          "Przedmiot (przypisany do Ciebie):", przedmioty_nauczyciela
       )
+
     c.execute(
         "SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń' AND klasa = ?",
         (o_klasa,),
