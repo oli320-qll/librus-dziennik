@@ -54,8 +54,6 @@ st.markdown(
 .uwaga-neut { background-color: #e2e3e5; color: #383d41; padding: 6px; border-left: 4px solid #6c757d; margin-bottom: 5px; border-radius: 3px; }
 .uwaga-neg { background-color: #f8d7da; color: #721c24; padding: 6px; border-left: 4px solid #dc3545; margin-bottom: 5px; border-radius: 3px; }
 
-.zastepstwo-box { background-color: #fff3cd; color: #856404; padding: 8px; border-left: 4px solid #ffc107; margin-bottom: 5px; border-radius: 3px; font-size: 13px; }
-
 .stButton>button {
     border-radius: 3px;
     font-size: 11px;
@@ -118,6 +116,11 @@ c.execute(
 c.execute(
     "CREATE TABLE IF NOT EXISTS oceny_zachowania (id INTEGER PRIMARY KEY"
     " AUTOINCREMENT, uczen TEXT, okres TEXT, ocena TEXT, opis TEXT)"
+)
+c.execute(
+    "CREATE TABLE IF NOT EXISTS terminarz (id INTEGER PRIMARY KEY"
+    " AUTOINCREMENT, data TEXT, klasa TEXT, przedmiot TEXT, typ TEXT, opis TEXT,"
+    " nauczyciel TEXT)"
 )
 
 # Bezpieczna migracja kolumn w ocenach
@@ -387,6 +390,24 @@ def renderuj_panel_dyzurow():
     st.info("Brak zaplanowanych dyżurów w systemie.")
 
 
+def renderuj_terminarz_dla_klasy(docelowa_klasa):
+  st.subheader(f"Terminarz (Sprawdziany i Kartkówki) — Klasa: {docelowa_klasa}")
+  df_term = pd.read_sql(
+      "SELECT id, data as [Data], klasa as [Klasa], przedmiot as [Przedmiot],"
+      " typ as [Rodzaj], opis as [Opis / Zakres], nauczyciel as [Nauczyciel]"
+      " FROM terminarz WHERE klasa = ? ORDER BY data ASC",
+      conn,
+      params=(docelowa_klasa,),
+  )
+  if not df_term.empty:
+    st.dataframe(df_term, use_container_width=True, hide_index=True)
+  else:
+    st.info(
+        "Brak zaplanowanych sprawdzianów lub kartkówek w terminarzu dla tej"
+        " klasy."
+    )
+
+
 def renderuj_zakladke_wiadomosci(aktualny_uzytkownik):
   st.subheader("Skrzynka wiadomości")
   c.execute(
@@ -481,7 +502,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-cols_ikony = st.columns(9)
+cols_ikony = st.columns(10)
 with cols_ikony[0]:
   if st.button("&#127968;\nInterfejs", use_container_width=True):
     st.session_state["librus_aktywna_zakladka"] = "Interfejs"
@@ -520,10 +541,14 @@ with cols_ikony[6]:
     st.session_state["librus_aktywna_zakladka"] = "Plan"
     st.rerun()
 with cols_ikony[7]:
+  if st.button("&#128198;\nTerminarz", use_container_width=True):
+    st.session_state["librus_aktywna_zakladka"] = "Terminarz"
+    st.rerun()
+with cols_ikony[8]:
   if st.button("&#9881;\nUstawienia", use_container_width=True):
     st.session_state["librus_aktywna_zakladka"] = "Ustawienia"
     st.rerun()
-with cols_ikony[8]:
+with cols_ikony[9]:
   if st.button("&#128682;\nWyloguj", use_container_width=True):
     st.session_state["dziennik_user"] = None
     st.session_state["dziennik_rola"] = None
@@ -788,30 +813,6 @@ elif st.session_state["dziennik_rola"] == "Admin":
         st.rerun()
     st.markdown("---")
     renderuj_tabelue_planu_dla_klasy("1c SP5", allow_change=True)
-    st.markdown("---")
-    st.write("### Usuwanie lekcji z planu")
-    df_plan_all = pd.read_sql(
-        "SELECT id, klasa as [Klasa], dzien as [Dzień], nr_lekcji as [Lekcja],"
-        " przedmiot as [Przedmiot] FROM plan_lekcji",
-        conn,
-    )
-    if not df_plan_all.empty:
-      st.dataframe(df_plan_all, use_container_width=True, hide_index=True)
-      with st.form("form_usun_lekcje_z_planu"):
-        plan_id_do_usuniecia = st.selectbox(
-            "Wybierz ID wpisu planu do usunięcia:",
-            df_plan_all["id"].tolist(),
-        )
-        btn_usun_pl = st.form_submit_button(
-            "Usuń wybraną lekcję z planu", type="primary"
-        )
-        if btn_usun_pl:
-          c.execute("DELETE FROM plan_lekcji WHERE id = ?", (plan_id_do_usuniecia,))
-          conn.commit()
-          st.success(f"Usunięto lekcję o ID: {plan_id_do_usuniecia}!")
-          st.rerun()
-    else:
-      st.info("Brak lekcji w planie.")
 
   with adm_tab4:
     st.subheader("Zarządzanie Zastępstwami")
@@ -856,27 +857,6 @@ elif st.session_state["dziennik_rola"] == "Admin":
         )
         conn.commit()
         st.success("Dodano zastępstwo!")
-        st.rerun()
-    st.markdown("---")
-    st.subheader("Zarządzanie Dyżurami Nauczycielskimi")
-    with st.form("form_dyzur_adm"):
-      d_dzien = st.selectbox(
-          "Dzień dyżuru:",
-          ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek"],
-      )
-      d_godz = st.text_input("Godzina / Przerwa (np. 09:35 - 09:45):")
-      d_miejsce = st.text_input("Miejsce (np. Korytarz I piętro - sektor A):")
-      d_osoba = st.selectbox(
-          "Nauczyciel:", nauczyciele_z if nauczyciele_z else ["-"]
-      )
-      if st.form_submit_button("Dodaj dyżur", type="primary"):
-        c.execute(
-            "INSERT INTO dyzury (osoba, miejsce, dzien, godzina) VALUES (?, ?,"
-            " ?, ?)",
-            (d_osoba, d_miejsce, d_dzien, d_godz),
-        )
-        conn.commit()
-        st.success("Dodano dyżur!")
         st.rerun()
 
   with adm_tab5:
@@ -936,7 +916,6 @@ elif st.session_state["dziennik_rola"] == "Nauczyciel":
       klasy_w = [k[0] for k in c.fetchall()]
       f_klasa = st.selectbox("Klasa:", klasy_w if klasy_w else ["1c SP5"])
 
-      # Przypisane przedmioty dla danego nauczyciela w danej klasie
       c.execute(
           "SELECT DISTINCT przedmiot FROM przypisania WHERE nauczyciel = ?"
           " AND klasa = ?",
@@ -989,7 +968,6 @@ elif st.session_state["dziennik_rola"] == "Nauczyciel":
         )
         wyniki_f[u[0]] = status
 
-    # Dynamiczne podsumowanie odświeżające się natychmiast po zmianie wyboru
     ile_ob = sum(1 for s in wyniki_f.values() if s == "ob")
     ile_nb = sum(1 for s in wyniki_f.values() if s == "nb")
     ile_u = sum(1 for s in wyniki_f.values() if s == "u")
@@ -1016,6 +994,69 @@ elif st.session_state["dziennik_rola"] == "Nauczyciel":
         conn.commit()
       st.success("Pomyślnie zapisano temat lekcji oraz frekwencję!")
       st.rerun()
+
+  elif akt_zakl == "Terminarz":
+    st.subheader("Terminarz — Dodawanie sprawdzianów i kartkówek")
+    with st.form("form_dodaj_terminarz"):
+      col_t1, col_t2 = st.columns(2)
+      with col_t1:
+        t_data = st.date_input("Data wydarzenia:", value=date.today())
+        c.execute("SELECT nazwa_klasy FROM klasy")
+        klasy_t = [k[0] for k in c.fetchall()]
+        t_klasa = st.selectbox("Klasa:", klasy_t if klasy_t else ["1c SP5"])
+      with col_t2:
+        c.execute(
+            "SELECT DISTINCT przedmiot FROM przypisania WHERE nauczyciel = ?"
+            " AND klasa = ?",
+            (st.session_state["dziennik_user"], t_klasa),
+        )
+        prz_t = [p[0] for p in c.fetchall()]
+        if not prz_t:
+          prz_t = WSZYSTKIE_PRZEDMIOTY
+        t_przedmiot = st.selectbox("Przedmiot:", prz_t)
+        t_typ = st.selectbox(
+            "Typ wydarzenia:", ["Sprawdzian", "Kartkówka", "Zadanie domowe"]
+        )
+
+      t_opis = st.text_area("Opis / Zakres materiału / Sala:")
+      if st.form_submit_button("Dodaj do terminarza", type="primary"):
+        c.execute(
+            "INSERT INTO terminarz (data, klasa, przedmiot, typ, opis,"
+            " nauczyciel) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                str(t_data),
+                t_klasa,
+                t_przedmiot,
+                t_typ,
+                t_opis,
+                st.session_state["dziennik_user"],
+            ),
+        )
+        conn.commit()
+        st.success("Pomyślnie dodano wpis do terminarza!")
+        st.rerun()
+
+    st.markdown("---")
+    st.subheader("Wpisy w terminarzu dodane przez Ciebie")
+    df_moje_term = pd.read_sql(
+        "SELECT id, data as [Data], klasa as [Klasa], przedmiot as [Przedmiot],"
+        " typ as [Typ], opis as [Opis] FROM terminarz WHERE nauczyciel = ?",
+        conn,
+        params=(st.session_state["dziennik_user"],),
+    )
+    if not df_moje_term.empty:
+      st.dataframe(df_moje_term, use_container_width=True, hide_index=True)
+      with st.form("form_usun_terminarz"):
+        t_id_del = st.selectbox(
+            "Wybierz ID wpisu do usunięcia:", df_moje_term["id"].tolist()
+        )
+        if st.form_submit_button("Usuń wybrany wpis", type="primary"):
+          c.execute("DELETE FROM terminarz WHERE id = ?", (t_id_del,))
+          conn.commit()
+          st.success("Usunięto wpis z terminarza!")
+          st.rerun()
+    else:
+      st.info("Brak Twoich wpisów w terminarzu.")
 
   elif akt_zakl == "Interfejs" or akt_zakl == "Plan":
     n_tab1, n_tab2 = st.tabs(["Plan Lekcji i Zastępstwa", "Moje Dyżury"])
@@ -1100,7 +1141,6 @@ elif st.session_state["dziennik_rola"] == "Nauczyciel":
           )
           st.rerun()
 
-    # --- SEKCJA PODGLĄDU I POPRAWY OCEN ---
     st.markdown("---")
     with st.expander(f"Edycja oceny / Poprawa oceny ({o_przedmiot})"):
       df_istniejace = pd.read_sql(
@@ -1211,6 +1251,8 @@ elif st.session_state["dziennik_rola"] == "Rodzic":
       )
       st.write("### 📊 Statystyki frekwencji dziecka")
       renderuj_podsumowanie_frekwencji(df_frez)
+  elif akt_zakl == "Terminarz":
+    renderuj_terminarz_dla_klasy(klasa_rodzica)
   elif akt_zakl == "Plan" or akt_zakl == "Interfejs":
     renderuj_tabelue_planu_dla_klasy(klasa_rodzica, allow_change=False)
   elif akt_zakl == "Wiadomości":
@@ -1244,6 +1286,8 @@ else:
     )
     st.write("### 📊 Moje podsumowanie frekwencji")
     renderuj_podsumowanie_frekwencji(df_frez)
+  elif akt_zakl == "Terminarz":
+    renderuj_terminarz_dla_klasy(klasa_ucznia)
   elif akt_zakl == "Plan" or akt_zakl == "Interfejs":
     renderuj_tabelue_planu_dla_klasy(klasa_ucznia, allow_change=False)
   elif akt_zakl == "Wiadomości":
