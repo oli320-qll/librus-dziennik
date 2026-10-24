@@ -593,7 +593,7 @@ if akt_zakl == "Ustawienia":
       elif not st_haslo_nowe or len(st_haslo_nowe) < 4:
         st.error("Nowe hasło musi mieć co najmniej 4 znaki!")
       elif st_haslo_nowe != st_haslo_nowe_powt:
-        st.error("Nowe hasła nie zgadjają się!")
+        st.error("Nowe hasła nie zgadzają się!")
       else:
         c.execute(
             "UPDATE uzytkownicy SET haslo = ? WHERE imie_nazwisko = ?",
@@ -995,6 +995,41 @@ elif st.session_state["dziennik_rola"] == "Nauczyciel":
       st.success("Pomyślnie zapisano temat lekcji oraz frekwencję!")
       st.rerun()
 
+  elif akt_zakl == "Uwagi":
+    st.subheader("Uwagi o uczniach — Dodawanie i przegląd")
+    c.execute("SELECT nazwa_klasy FROM klasy")
+    klasy_uw = [k[0] for k in c.fetchall()]
+    u_klasa_wyb = st.selectbox("Wybierz klasę:", klasy_uw if klasy_uw else ["1c SP5"])
+    
+    c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń' AND klasa = ?", (u_klasa_wyb,))
+    uczniowie_uw = [u[0] for u in c.fetchall()]
+    if not uczniowie_uw:
+      c.execute("SELECT imie_nazwisko FROM uzytkownicy WHERE rola = 'Uczeń'")
+      uczniowie_uw = [u[0] for u in c.fetchall()]
+
+    with st.form("form_dodaj_uwage_nauczyciel"):
+      uw_uczen = st.selectbox("Wybierz ucznia:", uczniowie_uw if uczniowie_uw else ["Brak"])
+      uw_typ = st.selectbox("Typ uwagi:", ["Pozytywna", "Negatywna", "Neutralna"])
+      uw_tresc = st.text_area("Treść uwagi:")
+      if st.form_submit_button("Dodaj uwagę", type="primary"):
+        if uw_uczen and uw_uczen != "Brak" and uw_tresc.strip():
+          c.execute(
+              "INSERT INTO uwagi (uczen, nauczyciel, typ, tresc, data) VALUES (?, ?, ?, ?, ?)",
+              (uw_uczen, st.session_state["dziennik_user"], uw_typ, uw_tresc, str(date.today()))
+          )
+          conn.commit()
+          st.success("Wpisano uwagę do dziennika!")
+          st.rerun()
+        else:
+          st.error("Proszę podać treść uwagi!")
+
+    st.markdown("---")
+    if uczniowie_uw:
+      st.write("#### Historia uwag uczniów wybranej klasy")
+      for uc_i in uczniowie_uw:
+        st.markdown(f"**Uczeń: {uc_i}**")
+        renderuj_uwagi_dla_osoby(uc_i)
+
   elif akt_zakl == "Terminarz":
     st.subheader("Terminarz — Dodawanie sprawdzianów i kartkówek")
     with st.form("form_dodaj_terminarz"):
@@ -1074,7 +1109,6 @@ elif st.session_state["dziennik_rola"] == "Nauczyciel":
           "Wybierz klasę do oceny:", klasy_do_ocen if klasy_do_ocen else ["1c SP5"]
       )
     with col_p2:
-      # FILTROWANIE: Pobieranie tylko przedmiotów przypisanych do zalogowanego nauczyciela
       c.execute(
           "SELECT DISTINCT przedmiot FROM przypisania WHERE nauczyciel = ?"
           " AND klasa = ?",
